@@ -1,0 +1,481 @@
+{# safety_check.html #}
+{# SmartFactoryAttendance — AI PPE Safety Gear Inspection Terminal #}
+
+{% extends "base.html" %}
+
+{% block title %}Safety Gear Check - Smart Factory Attendance{% endblock %}
+{% block page_title %}Safety Gear Check &amp; AI Inspection{% endblock %}
+
+{% block content %}
+<section class="safety-inspection fade-in-up">
+    {# ---- Page Header ---- #}
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
+        <div>
+            <h2 class="h4 fw-bold text-light mb-1">
+                <i data-lucide="hard-hat" class="d-inline-block text-info me-2" style="width: 24px; height: 24px;"></i>
+                Safety Gear Check &amp; PPE Compliance
+            </h2>
+            <p class="text-secondary small mb-0">Automated PPE verification via Ultralytics YOLOv8 object detection on worker inspection photographs</p>
+        </div>
+        <div id="ppe-model-badge">
+            <span class="badge bg-secondary px-3 py-2">
+                <span class="spinner-border spinner-border-sm me-1" role="status"></span> Checking YOLO Model...
+            </span>
+        </div>
+    </div>
+
+    {# ---- Model Status Notice Banner ---- #}
+    <div id="model-status-banner" class="alert alert-secondary d-flex align-items-center gap-2 mb-4">
+        <i data-lucide="info" style="width: 18px; height: 18px;"></i>
+        <span id="model-status-text">Querying YOLO model telemetry from backend...</span>
+    </div>
+
+    {# ---- Main Inspection Grid ---- #}
+    <div class="row g-4 mb-4">
+        {# Left Column: Upload & Inspection Setup #}
+        <div class="col-lg-5">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h3 class="card-title">
+                        <i data-lucide="upload-cloud" class="text-info"></i>
+                        Inspection Image Upload
+                    </h3>
+                    <span class="small text-muted font-monospace">Step 1 &amp; 2</span>
+                </div>
+                <div class="card-body">
+                    <form id="safety-check-form" enctype="multipart/form-data">
+                        {# 1. Select or Enter Employee ID #}
+                        <div class="mb-3">
+                            <label class="form-label" for="employee-id-input">
+                                Registered Worker <span class="text-danger">*</span>
+                            </label>
+                            <div class="input-group mb-2">
+                                <select class="form-select" id="employee-select" onchange="syncEmployeeId(this.value)">
+                                    <option value="" selected>-- Select from Active Workers --</option>
+                                    {% if employees %}
+                                        {% for emp in employees %}
+                                            <option value="{{ emp.employee_id }}">
+                                                {{ emp.employee_id }} &mdash; {{ emp.first_name }} {{ emp.last_name }} ({{ emp.department }})
+                                            </option>
+                                        {% endfor %}
+                                    {% endif %}
+                                </select>
+                            </div>
+                            <input type="text" class="form-control font-monospace" id="employee-id-input" name="employee_id"
+                                   placeholder="Or type Employee ID (e.g. PRD-0001)" required>
+                        </div>
+
+                        {# 2. Upload Box / Dropzone #}
+                        <div class="mb-3">
+                            <label class="form-label">Inspection Photograph <span class="text-danger">*</span></label>
+                            <div class="upload-dropzone" id="dropzone" onclick="document.getElementById('file-upload').click()">
+                                <i data-lucide="image-plus" class="text-info mb-2" style="width: 38px; height: 38px;"></i>
+                                <div class="fw-semibold text-light mb-1">Click to browse or drop photograph here</div>
+                                <div class="small text-muted">Supports PNG, JPG, JPEG (Max 10 MB)</div>
+                                <input type="file" id="file-upload" name="file" accept="image/*,video/*" class="d-none" onchange="handleFilePreview(this)">
+                            </div>
+                        </div>
+
+                        {# Image Upload Preview #}
+                        <div id="upload-preview-wrapper" class="mb-3 d-none">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <span class="small text-muted font-monospace">Uploaded Preview:</span>
+                                <button type="button" class="btn btn-link btn-sm text-danger p-0 text-decoration-none" onclick="clearUploadPreview()">
+                                    <i data-lucide="trash-2" style="width: 13px; height: 13px;"></i> Remove
+                                </button>
+                            </div>
+                            <div class="image-preview-container">
+                                <img id="preview-image" src="" alt="Upload Preview">
+                            </div>
+                        </div>
+
+                        {# Compliance Requirements Legend #}
+                        <div class="p-3 rounded mb-3" style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-subtle);">
+                            <div class="small fw-semibold text-secondary text-uppercase mb-2">Compliance Rule Engine:</div>
+                            <div class="small text-muted mb-1">
+                                <i data-lucide="check" class="text-success me-1" style="width: 13px; height: 13px;"></i>
+                                <strong>Mandatory Gear:</strong> Helmet, High-Visibility Vest, Safety Boots
+                            </div>
+                            <div class="small text-muted">
+                                <i data-lucide="info" class="text-info me-1" style="width: 13px; height: 13px;"></i>
+                                <strong>Secondary Gear:</strong> Safety Gloves (Reported &amp; Tracked)
+                            </div>
+                        </div>
+
+                        {# Submit Button #}
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-primary btn-lg" id="run-check-btn">
+                                <i data-lucide="play" style="width: 18px; height: 18px;"></i> Run Safety Inspection
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        {# Right Column: Detection Results & Annotated Visualizer #}
+        <div class="col-lg-7">
+            <div class="card h-100">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h3 class="card-title">
+                        <i data-lucide="scan-eye" class="text-info"></i>
+                        Inspection Verdict &amp; Visual Bounding Boxes
+                    </h3>
+                    <span id="verdict-tag" class="badge bg-secondary">AWAITING INSPECTION</span>
+                </div>
+                <div class="card-body">
+                    {# Loading State #}
+                    <div id="inspection-loading" class="text-center py-5 d-none">
+                        <div class="spinner-border text-info mb-3" style="width: 3rem; height: 3rem;" role="status"></div>
+                        <h4 class="h5 fw-bold text-light mb-1">Analyzing Worker Safety Gear...</h4>
+                        <p class="text-muted small">Executing Ultralytics YOLOv8 inference &amp; mapping canonical PPE classes</p>
+                    </div>
+
+                    {# Empty Initial State #}
+                    <div id="inspection-empty" class="text-center py-5">
+                        <div class="p-4 rounded-circle d-inline-flex mb-3" style="background: rgba(6, 182, 212, 0.06); border: 1px solid var(--border-accent);">
+                            <i data-lucide="shield" class="text-info" style="width: 48px; height: 48px;"></i>
+                        </div>
+                        <h4 class="h5 fw-bold text-light mb-1">No Inspection Active</h4>
+                        <p class="text-muted small mx-auto" style="max-width: 400px;">
+                            Select a factory employee and upload a photograph to perform real computer vision verification of safety gear.
+                        </p>
+                    </div>
+
+                    {# Active Results Container #}
+                    <div id="inspection-results" class="d-none">
+                        {# Verdict Alert #}
+                        <div id="verdict-banner" class="alert mb-4"></div>
+
+                        {# Side-by-side or Tabbed Annotated Viewer #}
+                        <div class="mb-4">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <span class="small fw-semibold text-secondary text-uppercase">YOLO Bounding Box Annotation:</span>
+                                <span class="badge bg-primary font-monospace" id="conf-badge">CONFIDENCE: --%</span>
+                            </div>
+                            <div class="image-preview-container" style="background: #050810; min-height: 260px;">
+                                <img id="annotated-image-view" src="" alt="YOLO Annotated PPE" class="img-fluid rounded">
+                            </div>
+                        </div>
+
+                        {# Gear Checklist Grid #}
+                        <div class="row g-3 mb-4">
+                            <div class="col-md-6">
+                                <div class="p-3 rounded border border-secondary border-opacity-25" style="background: rgba(255,255,255,0.02);">
+                                    <div class="small fw-semibold text-secondary text-uppercase mb-2">Detected PPE Items:</div>
+                                    <div id="detected-gear-list"></div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="p-3 rounded border border-secondary border-opacity-25" style="background: rgba(255,255,255,0.02);">
+                                    <div class="small fw-semibold text-secondary text-uppercase mb-2">Missing Mandatory Gear:</div>
+                                    <div id="missing-gear-list"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {# Raw Detections & Confidence Breakdown #}
+                        <div class="p-3 rounded border border-secondary border-opacity-25" style="background: rgba(255,255,255,0.02);">
+                            <div class="small fw-semibold text-secondary text-uppercase mb-2">Detection Confidence Breakdown:</div>
+                            <div id="detections-detail-list" class="small"></div>
+                            <div class="mt-2 pt-2 border-top border-secondary border-opacity-25 small text-muted font-monospace d-flex justify-content-between">
+                                <span id="res-check-id">Check ID: --</span>
+                                <span id="res-employee-id">Worker: --</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {# ---- Recent Inspection Activity Table ---- #}
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h3 class="card-title">
+                <i data-lucide="history" class="text-info"></i>
+                Historical Safety Gear Inspections Log
+            </h3>
+            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="loadInspectionHistory()">
+                <i data-lucide="refresh-cw" style="width: 13px; height: 13px;"></i> Refresh Log
+            </button>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table align-middle">
+                    <thead>
+                        <tr>
+                            <th>Check ID</th>
+                            <th>Worker</th>
+                            <th>Department</th>
+                            <th>Timestamp</th>
+                            <th>Helmet</th>
+                            <th>Vest</th>
+                            <th>Boots</th>
+                            <th>Gloves</th>
+                            <th>Score</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="safety-history-tbody">
+                        <tr>
+                            <td colspan="10" class="text-center text-muted py-4">
+                                <span class="spinner-border spinner-border-sm text-info me-2"></span> Loading safety inspection records...
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Sync dropdown selection with text input
+    function syncEmployeeId(val) {
+        if (val) {
+            document.getElementById("employee-id-input").value = val;
+        }
+    }
+
+    // Handle file selection preview
+    function handleFilePreview(input) {
+        if (input.files && input.files[0]) {
+            var reader = new FileReader();
+            reader.onload = function (e) {
+                document.getElementById("preview-image").src = e.target.result;
+                document.getElementById("upload-preview-wrapper").classList.remove("d-none");
+            };
+            reader.readAsDataURL(input.files[0]);
+        }
+    }
+
+    function clearUploadPreview() {
+        document.getElementById("file-upload").value = "";
+        document.getElementById("preview-image").src = "";
+        document.getElementById("upload-preview-wrapper").classList.add("d-none");
+    }
+
+    // Check YOLO model availability on load
+    function checkPPEStatus() {
+        fetch("{{ url_for('safety_gear.ppe_detector_status') }}")
+            .then(function (res) { return res.json(); })
+            .then(function (data) {
+                var badgeEl = document.getElementById("ppe-model-badge");
+                var bannerEl = document.getElementById("model-status-banner");
+                var textEl = document.getElementById("model-status-text");
+
+                if (data.status === "ok" && data.model_available) {
+                    badgeEl.innerHTML = '<span class="badge bg-success px-3 py-2"><i data-lucide="check-circle" style="width: 13px; height: 13px;" class="me-1"></i> YOLOv8 MODEL ONLINE</span>';
+                    bannerEl.className = "alert alert-success d-flex align-items-center gap-2 mb-4";
+                    textEl.innerHTML = "<strong>YOLOv8 PPE Vision Detector Online:</strong> Genuine neural inference active for Helmet, Vest, Boots &amp; Gloves.";
+                } else {
+                    badgeEl.innerHTML = '<span class="badge bg-warning px-3 py-2"><i data-lucide="alert-triangle" style="width: 13px; height: 13px;" class="me-1"></i> MODEL NOT CONFIGURED</span>';
+                    bannerEl.className = "alert alert-warning d-flex align-items-center gap-2 mb-4";
+                    textEl.innerHTML = "<strong>No trained PPE model configured:</strong> " + escapeHtml(data.recommended_model || "Configure weights/best.pt to enable real detection.");
+                }
+                if (window.lucide) { lucide.createIcons(); }
+            })
+            .catch(function () {});
+    }
+
+    // Load recent safety checks
+    function loadInspectionHistory() {
+        var tbody = document.getElementById("safety-history-tbody");
+        fetch("{{ url_for('safety_gear.safety_check_history') }}")
+            .then(function (res) { return res.json(); })
+            .then(function (data) {
+                if (data.status === "ok" && data.history && data.history.length > 0) {
+                    var html = "";
+                    data.history.forEach(function (rec) {
+                        var timeStr = rec.check_time ? new Date(rec.check_time).toLocaleString() : "-";
+                        var helmetBadge = rec.helmet_detected ? '<span class="badge bg-success">Yes</span>' : '<span class="badge bg-danger">No</span>';
+                        var vestBadge = rec.vest_detected ? '<span class="badge bg-success">Yes</span>' : '<span class="badge bg-danger">No</span>';
+                        var bootsBadge = rec.boots_detected ? '<span class="badge bg-success">Yes</span>' : '<span class="badge bg-danger">No</span>';
+                        var glovesBadge = rec.gloves_detected ? '<span class="badge bg-info">Yes</span>' : '<span class="badge bg-secondary">No</span>';
+                        var scoreStr = rec.confidence_score ? rec.confidence_score.toFixed(1) + "%" : "-";
+                        var verdict = rec.is_compliant
+                            ? '<span class="badge bg-success"><i data-lucide="check" style="width: 11px; height: 11px;" class="me-1"></i>COMPLIANT</span>'
+                            : '<span class="badge bg-danger"><i data-lucide="x" style="width: 11px; height: 11px;" class="me-1"></i>NON-COMPLIANT</span>';
+
+                        html += '<tr>' +
+                            '<td class="font-monospace text-muted">#' + rec.id + '</td>' +
+                            '<td>' +
+                                '<div class="fw-semibold text-light">' + escapeHtml(rec.employee_name) + '</div>' +
+                                '<div class="small text-muted font-monospace">' + escapeHtml(rec.employee_id_str) + '</div>' +
+                            '</td>' +
+                            '<td><span class="badge bg-secondary">' + escapeHtml(rec.department) + '</span></td>' +
+                            '<td class="font-monospace text-secondary small">' + timeStr + '</td>' +
+                            '<td>' + helmetBadge + '</td>' +
+                            '<td>' + vestBadge + '</td>' +
+                            '<td>' + bootsBadge + '</td>' +
+                            '<td>' + glovesBadge + '</td>' +
+                            '<td class="font-monospace text-info">' + scoreStr + '</td>' +
+                            '<td>' + verdict + '</td>' +
+                        '</tr>';
+                    });
+                    tbody.innerHTML = html;
+                    if (window.lucide) { lucide.createIcons(); }
+                } else {
+                    tbody.innerHTML = '<tr><td colspan="10" class="text-center text-muted py-4">No inspection records logged in database yet.</td></tr>';
+                }
+            })
+            .catch(function () {
+                tbody.innerHTML = '<tr><td colspan="10" class="text-center text-muted py-4">Unable to load safety check history.</td></tr>';
+            });
+    }
+
+    // Submit safety inspection form
+    document.addEventListener("DOMContentLoaded", function () {
+        checkPPEStatus();
+        loadInspectionHistory();
+
+        var form = document.getElementById("safety-check-form");
+        var dropzone = document.getElementById("dropzone");
+
+        // Drag and drop events
+        ["dragenter", "dragover"].forEach(function (eventName) {
+            dropzone.addEventListener(eventName, function (e) {
+                e.preventDefault();
+                dropzone.classList.add("dragover");
+            }, false);
+        });
+        ["dragleave", "drop"].forEach(function (eventName) {
+            dropzone.addEventListener(eventName, function (e) {
+                e.preventDefault();
+                dropzone.classList.remove("dragover");
+            }, false);
+        });
+        dropzone.addEventListener("drop", function (e) {
+            var dt = e.dataTransfer;
+            var files = dt.files;
+            if (files && files.length > 0) {
+                document.getElementById("file-upload").files = files;
+                handleFilePreview(document.getElementById("file-upload"));
+            }
+        });
+
+        form.addEventListener("submit", function (e) {
+            e.preventDefault();
+            var empId = document.getElementById("employee-id-input").value.trim();
+            var fileInput = document.getElementById("file-upload");
+
+            if (!empId) {
+                alert("Please select or enter an Employee ID.");
+                return;
+            }
+            if (!fileInput.files || fileInput.files.length === 0) {
+                alert("Please upload an inspection photograph.");
+                return;
+            }
+
+            var btn = document.getElementById("run-check-btn");
+            var originalBtnHtml = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span> Inspecting with YOLO...';
+
+            document.getElementById("inspection-empty").classList.add("d-none");
+            document.getElementById("inspection-results").classList.add("d-none");
+            document.getElementById("inspection-loading").classList.remove("d-none");
+
+            var formData = new FormData(form);
+
+            fetch("{{ url_for('safety_gear.run_safety_check') }}", {
+                method: "POST",
+                body: formData
+            })
+            .then(function (res) { return res.json(); })
+            .then(function (data) {
+                btn.disabled = false;
+                btn.innerHTML = originalBtnHtml;
+                document.getElementById("inspection-loading").classList.add("d-none");
+
+                if (data.status === "ok") {
+                    document.getElementById("inspection-results").classList.remove("d-none");
+
+                    var isCompliant = data.compliant;
+                    var verdictTag = document.getElementById("verdict-tag");
+                    var banner = document.getElementById("verdict-banner");
+
+                    if (isCompliant) {
+                        verdictTag.className = "badge bg-success";
+                        verdictTag.innerHTML = '<i data-lucide="check-circle" style="width:12px;height:12px;" class="me-1"></i>COMPLIANT';
+                        banner.className = "alert alert-success";
+                        banner.innerHTML = '<div class="d-flex align-items-center gap-2"><i data-lucide="shield-check" style="width:20px;height:20px;"></i><div><strong>Safety Compliance Confirmed:</strong> Worker meets all required factory safety gear mandates.</div></div>';
+                    } else {
+                        verdictTag.className = "badge bg-danger";
+                        verdictTag.innerHTML = '<i data-lucide="alert-triangle" style="width:12px;height:12px;" class="me-1"></i>NON-COMPLIANT';
+                        banner.className = "alert alert-danger";
+                        banner.innerHTML = '<div class="d-flex align-items-center gap-2"><i data-lucide="shield-alert" style="width:20px;height:20px;"></i><div><strong>Safety Violation Detected:</strong> One or more mandatory PPE items are missing. Access restricted.</div></div>';
+                    }
+
+                    // Display image: annotated if available, else original
+                    var imgView = document.getElementById("annotated-image-view");
+                    imgView.src = data.annotated_image_url || data.image_url;
+
+                    // Confidence badge
+                    document.getElementById("conf-badge").textContent = "CONFIDENCE: " + (data.confidence_score || 0).toFixed(1) + "%";
+
+                    // Detected gear list
+                    var detectedHtml = "";
+                    if (data.detected_gear && data.detected_gear.length > 0) {
+                        data.detected_gear.forEach(function (g) {
+                            detectedHtml += '<span class="gear-badge-chip detected"><i data-lucide="check" style="width:12px;height:12px;"></i> ' + escapeHtml(g.toUpperCase()) + '</span>';
+                        });
+                    } else {
+                        detectedHtml = '<span class="text-muted small">No mandatory gear detected</span>';
+                    }
+                    document.getElementById("detected-gear-list").innerHTML = detectedHtml;
+
+                    // Missing gear list
+                    var missingHtml = "";
+                    if (data.missing_gear && data.missing_gear.length > 0) {
+                        data.missing_gear.forEach(function (g) {
+                            missingHtml += '<span class="gear-badge-chip missing"><i data-lucide="x" style="width:12px;height:12px;"></i> ' + escapeHtml(g.toUpperCase()) + '</span>';
+                        });
+                    } else {
+                        missingHtml = '<span class="text-success small fw-semibold"><i data-lucide="check-circle" style="width:13px;height:13px;" class="me-1"></i> All required gear present</span>';
+                    }
+                    document.getElementById("missing-gear-list").innerHTML = missingHtml;
+
+                    // Detection breakdown list
+                    var rawList = "";
+                    if (data.detections && data.detections.length > 0) {
+                        data.detections.forEach(function (d) {
+                            var pct = (d.confidence * 100).toFixed(1);
+                            rawList += '<div class="d-flex justify-content-between align-items-center py-1 border-bottom border-secondary border-opacity-25">' +
+                                '<span class="text-light"><i data-lucide="disc" style="width:11px;height:11px;" class="text-info me-1"></i> ' + escapeHtml(d.class.toUpperCase()) + '</span>' +
+                                '<span class="font-monospace text-info">' + pct + '%</span>' +
+                            '</div>';
+                        });
+                    } else {
+                        rawList = '<span class="text-muted">No individual PPE bounding boxes identified</span>';
+                    }
+                    document.getElementById("detections-detail-list").innerHTML = rawList;
+
+                    document.getElementById("res-check-id").textContent = "Check Record #" + data.check_id;
+                    document.getElementById("res-employee-id").textContent = "Worker: " + data.employee_id;
+
+                    loadInspectionHistory();
+                    if (window.lucide) { lucide.createIcons(); }
+                } else if (data.code === "PPE_MODEL_UNAVAILABLE") {
+                    document.getElementById("inspection-empty").classList.remove("d-none");
+                    alert("PPE Model Unavailable: " + data.message);
+                } else {
+                    document.getElementById("inspection-empty").classList.remove("d-none");
+                    alert(data.message || "Inspection failed.");
+                }
+            })
+            .catch(function (err) {
+                btn.disabled = false;
+                btn.innerHTML = originalBtnHtml;
+                document.getElementById("inspection-loading").classList.add("d-none");
+                document.getElementById("inspection-empty").classList.remove("d-none");
+                alert("An error occurred while running inspection.");
+            });
+        });
+    });
+</script>
+{% endblock %}

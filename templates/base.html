@@ -1,0 +1,195 @@
+{# base.html #}
+{# SmartFactoryAttendance — Premium Industrial AI SaaS Dashboard Base Layout #}
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="AI-Powered Smart Factory Attendance and PPE Safety Monitoring Platform">
+    <title>{% block title %}Smart Factory Attendance & PPE AI Monitoring{% endblock %}</title>
+
+    {# Bootstrap 5 CSS (CDN) #}
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    {# Bootstrap Icons #}
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+    {# Chart.js for real-time analytics #}
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    {# Lucide Icons #}
+    <script src="https://unpkg.com/lucide@latest"></script>
+    {# Custom Industrial AI Stylesheet #}
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    {% block extra_head %}{% endblock %}
+</head>
+<body>
+    <div class="app-container">
+        {# ---- Industrial Collapsible Sidebar ---- #}
+        <aside class="app-sidebar" id="app-sidebar">
+            <div class="sidebar-header">
+                <a href="{{ url_for('main.index') }}" class="brand-badge">
+                    <div class="brand-icon-box">
+                        <i data-lucide="shield-check"></i>
+                    </div>
+                    <div class="brand-info">
+                        <span class="brand-name">SmartFactory</span>
+                        <span class="brand-tagline">AI Safety &amp; Biometrics</span>
+                    </div>
+                </a>
+            </div>
+
+            <div class="sidebar-status-pill">
+                <div class="d-flex align-items-center gap-2">
+                    <div class="pulse-indicator" id="sidebar-pulse-dot"></div>
+                    <span class="fw-semibold text-light">AI Telemetry</span>
+                </div>
+                <span class="badge bg-success">ACTIVE</span>
+            </div>
+
+            <div class="sidebar-nav-scroll">
+                <div class="nav-group-label">Core Operations</div>
+                <a href="{{ url_for('dashboard.dashboard_view') }}" class="sidebar-nav-item">
+                    <i data-lucide="layout-dashboard"></i>
+                    <span>Dashboard</span>
+                </a>
+                <a href="{{ url_for('main.index') }}" class="sidebar-nav-item">
+                    <i data-lucide="gauge"></i>
+                    <span>Plant Overview</span>
+                </a>
+
+                <div class="nav-group-label">Biometric Attendance</div>
+                <a href="{{ url_for('face_attendance.face_attendance_view') }}" class="sidebar-nav-item">
+                    <i data-lucide="scan-face"></i>
+                    <span>Face Attendance</span>
+                </a>
+                <a href="{{ url_for('main.auto_attendance') }}" class="sidebar-nav-item">
+                    <i data-lucide="monitor-play"></i>
+                    <span>Kiosk Mode</span>
+                </a>
+                <a href="{{ url_for('attendance.check_out_view') }}" class="sidebar-nav-item">
+                    <i data-lucide="log-out"></i>
+                    <span>Check-Out Terminal</span>
+                </a>
+                <a href="{{ url_for('attendance.attendance_view') }}" class="sidebar-nav-item">
+                    <i data-lucide="clipboard-list"></i>
+                    <span>Attendance Records</span>
+                </a>
+
+                <div class="nav-group-label">Safety Compliance</div>
+                <a href="{{ url_for('safety_gear.safety_gear_view') }}" class="sidebar-nav-item">
+                    <i data-lucide="hard-hat"></i>
+                    <span>PPE Safety Check</span>
+                </a>
+
+                <div class="nav-group-label">Workforce &amp; Setup</div>
+                <a href="{{ url_for('main.register') }}" class="sidebar-nav-item">
+                    <i data-lucide="users"></i>
+                    <span>Employee Directory</span>
+                </a>
+                <a href="{{ url_for('face_attendance.enroll') }}" class="sidebar-nav-item">
+                    <i data-lucide="user-plus"></i>
+                    <span>Face Enrollment</span>
+                </a>
+            </div>
+
+            <div class="sidebar-footer">
+                <div class="telemetry-compact">
+                    <div class="telemetry-row">
+                        <span>DETECTOR:</span>
+                        <span class="text-info">YuNet ONNX</span>
+                    </div>
+                    <div class="telemetry-row">
+                        <span>PPE MODEL:</span>
+                        <span class="text-info">YOLOv8 best.pt</span>
+                    </div>
+                    <div class="telemetry-row">
+                        <span>VERSION:</span>
+                        <span class="text-muted">v2.4 Industrial</span>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        {# ---- App Main Content Wrapper ---- #}
+        <div class="app-main">
+            {# Top Navigation Bar #}
+            <header class="app-topbar">
+                <div class="topbar-left">
+                    <button type="button" class="sidebar-toggle-btn d-lg-none" id="sidebar-toggle" aria-label="Toggle Sidebar">
+                        <i data-lucide="menu"></i>
+                    </button>
+                    <div class="topbar-breadcrumbs">
+                        <h1 class="topbar-page-title">
+                            {% block page_title %}Industrial AI Monitor{% endblock %}
+                        </h1>
+                    </div>
+                </div>
+
+                <div class="topbar-right">
+                    <div class="topbar-clock">
+                        <i data-lucide="clock" style="width: 15px; height: 15px;"></i>
+                        <span id="topbar-live-clock">--:--:--</span>
+                    </div>
+
+                    <div class="d-none d-sm-flex align-items-center gap-2 px-2 py-1 rounded" style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-subtle);">
+                        <div class="pulse-indicator" id="topbar-status-indicator" title="AI Monitoring Online"></div>
+                        <span class="small text-secondary fw-semibold">STATION 01</span>
+                    </div>
+
+                    <div class="topbar-profile">
+                        <div class="profile-avatar">OP</div>
+                        <div class="profile-details d-none d-md-flex">
+                            <span class="profile-name">Supervisor</span>
+                            <span class="profile-role">Safety Lead</span>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            {# Flash Messages Banner #}
+            <div class="container-fluid px-4 pt-3">
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        {% for category, message in messages %}
+                            <div class="alert alert-{{ category if category != 'error' else 'danger' }} alert-dismissible fade show" role="alert">
+                                <div class="d-flex align-items-center gap-2">
+                                    <i data-lucide="info" style="width: 18px; height: 18px;"></i>
+                                    <span>{{ message }}</span>
+                                </div>
+                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert" aria-label="Close"></button>
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+                {% endwith %}
+            </div>
+
+            {# Main Page Content Body #}
+            <main class="main-content">
+                {% block content %}{% endblock %}
+            </main>
+
+            {# Industrial System Footer #}
+            <footer class="border-top py-3 px-4 text-center text-md-between d-md-flex align-items-center" style="background: var(--bg-sidebar); border-color: var(--border-subtle) !important;">
+                <div class="small text-muted mb-2 mb-md-0">
+                    <i data-lucide="shield-check" class="d-inline-block align-middle me-1 text-info" style="width: 14px; height: 14px;"></i>
+                    <strong>SmartFactoryAttendance</strong> &mdash; AI Face Biometrics &amp; YOLO PPE Compliance Platform
+                </div>
+                <div class="small text-secondary font-monospace">
+                    Industrial System Health: <span class="text-success fw-bold">OPERATIONAL</span>
+                </div>
+            </footer>
+        </div>
+    </div>
+
+    {# Bootstrap 5 JS bundle (CDN) #}
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    {# Custom JavaScript #}
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    {% block scripts %}{% endblock %}
+    <script>
+        // Ensure Lucide icons render after every template block loads
+        if (window.lucide && typeof window.lucide.createIcons === "function") {
+            window.lucide.createIcons();
+        }
+    </script>
+</body>
+</html>

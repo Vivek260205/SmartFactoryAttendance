@@ -1,0 +1,614 @@
+{# dashboard.html #}
+{# SmartFactoryAttendance — Executive Industrial AI Operations Dashboard #}
+
+{% extends "base.html" %}
+
+{% block title %}Executive AI Dashboard - Smart Factory Attendance{% endblock %}
+{% block page_title %}Executive Operations Dashboard{% endblock %}
+
+{% block content %}
+<section class="dashboard fade-in-up">
+    {# ---- Page Header with Refresh & Station Info ---- #}
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
+        <div>
+            <h2 class="h4 fw-bold text-light mb-1">
+                <i data-lucide="layout-dashboard" class="d-inline-block text-info me-2" style="width: 24px; height: 24px;"></i>
+                Real-Time Factory Biometrics &amp; Safety Telemetry
+            </h2>
+            <p class="text-secondary small mb-0">Autonomous monitoring via OpenCV YuNet Face Biometrics &amp; Ultralytics YOLO PPE Vision</p>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+            <button type="button" class="btn btn-outline-secondary btn-sm" id="refresh-dashboard-btn">
+                <i data-lucide="refresh-cw" style="width: 14px; height: 14px;"></i> Refresh Telemetry
+            </button>
+            <span class="badge bg-primary px-3 py-2">
+                <i data-lucide="cpu" class="me-1" style="width: 13px; height: 13px;"></i> STATION 01 &bull; ONLINE
+            </span>
+        </div>
+    </div>
+
+    {# ---- 6 KPI Metric Cards ---- #}
+    <div class="row g-3 mb-4">
+        {# Total Registered #}
+        <div class="col-6 col-lg-2">
+            <div class="stat-card">
+                <div class="stat-top">
+                    <span class="stat-label">Total Workforce</span>
+                    <div class="stat-icon-wrapper blue">
+                        <i data-lucide="users"></i>
+                    </div>
+                </div>
+                <div class="stat-value" id="kpi-total-employees">--</div>
+                <div class="stat-meta">Active Registered</div>
+            </div>
+        </div>
+
+        {# Present Today #}
+        <div class="col-6 col-lg-2">
+            <div class="stat-card">
+                <div class="stat-top">
+                    <span class="stat-label">Present On Floor</span>
+                    <div class="stat-icon-wrapper green">
+                        <i data-lucide="user-check"></i>
+                    </div>
+                </div>
+                <div class="stat-value text-success" id="kpi-present-count">--</div>
+                <div class="stat-meta">Currently Checked In</div>
+            </div>
+        </div>
+
+        {# Absent Today #}
+        <div class="col-6 col-lg-2">
+            <div class="stat-card">
+                <div class="stat-top">
+                    <span class="stat-label">Absent Today</span>
+                    <div class="stat-icon-wrapper amber">
+                        <i data-lucide="user-x"></i>
+                    </div>
+                </div>
+                <div class="stat-value text-warning" id="kpi-absent-count">--</div>
+                <div class="stat-meta">Not Yet Checked In</div>
+            </div>
+        </div>
+
+        {# Attendance Percentage #}
+        <div class="col-6 col-lg-2">
+            <div class="stat-card">
+                <div class="stat-top">
+                    <span class="stat-label">Attendance Rate</span>
+                    <div class="stat-icon-wrapper cyan">
+                        <i data-lucide="percent"></i>
+                    </div>
+                </div>
+                <div class="stat-value text-info" id="kpi-attendance-pct">--%</div>
+                <div class="stat-meta">Shift Compliance</div>
+            </div>
+        </div>
+
+        {# PPE Checks Completed #}
+        <div class="col-6 col-lg-2">
+            <div class="stat-card">
+                <div class="stat-top">
+                    <span class="stat-label">PPE Inspections</span>
+                    <div class="stat-icon-wrapper blue">
+                        <i data-lucide="shield-check"></i>
+                    </div>
+                </div>
+                <div class="stat-value" id="kpi-ppe-checks">--</div>
+                <div class="stat-meta" id="kpi-ppe-today">Today: --</div>
+            </div>
+        </div>
+
+        {# Safety Compliance Rate #}
+        <div class="col-6 col-lg-2">
+            <div class="stat-card">
+                <div class="stat-top">
+                    <span class="stat-label">Safety Compliance</span>
+                    <div class="stat-icon-wrapper green">
+                        <i data-lucide="hard-hat"></i>
+                    </div>
+                </div>
+                <div class="stat-value text-success" id="kpi-compliance-rate">--%</div>
+                <div class="stat-meta">Real Model Results</div>
+            </div>
+        </div>
+    </div>
+
+    {# ---- System Service Availability Status Section ---- #}
+    <div class="card mb-4">
+        <div class="card-header">
+            <h3 class="card-title">
+                <i data-lucide="activity" class="text-info"></i>
+                Industrial AI Engine &amp; Infrastructure Health
+            </h3>
+            <span class="small text-muted font-monospace" id="system-health-timestamp">Verified real-time</span>
+        </div>
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-3">
+                    <div class="service-health-card">
+                        <div>
+                            <div class="service-title">
+                                <i data-lucide="server" class="text-info"></i> Flask Web Application
+                            </div>
+                            <span class="small text-muted">WSGI Runtime</span>
+                        </div>
+                        <span class="badge bg-success" id="health-flask">ONLINE</span>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="service-health-card">
+                        <div>
+                            <div class="service-title">
+                                <i data-lucide="database" class="text-info"></i> SQLite Database
+                            </div>
+                            <span class="small text-muted">instance/smart_factory.db</span>
+                        </div>
+                        <span class="badge bg-success" id="health-db">CONNECTED</span>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="service-health-card">
+                        <div>
+                            <div class="service-title">
+                                <i data-lucide="scan" class="text-info"></i> Face Biometric Engine
+                            </div>
+                            <span class="small text-muted" id="health-face-model">YuNet ONNX / Euclidean</span>
+                        </div>
+                        <span class="badge bg-success" id="health-face">READY</span>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="service-health-card">
+                        <div>
+                            <div class="service-title">
+                                <i data-lucide="eye" class="text-info"></i> PPE YOLO Detector
+                            </div>
+                            <span class="small text-muted" id="health-ppe-model">YOLOv8 weights/best.pt</span>
+                        </div>
+                        <span class="badge bg-success" id="health-ppe">ACTIVE</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {# ---- Analytics Charts Section ---- #}
+    <div class="row g-4 mb-4">
+        {# Attendance Trend Chart #}
+        <div class="col-lg-8">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h3 class="card-title">
+                        <i data-lucide="trending-up" class="text-info"></i>
+                        7-Day Attendance Trend Analysis
+                    </h3>
+                    <span class="badge bg-secondary font-monospace">Real Database Aggregation</span>
+                </div>
+                <div class="card-body">
+                    <div style="height: 280px; position: relative;">
+                        <canvas id="attendanceTrendChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {# PPE Compliance Chart #}
+        <div class="col-lg-4">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h3 class="card-title">
+                        <i data-lucide="pie-chart" class="text-info"></i>
+                        PPE Compliance Ratio
+                    </h3>
+                    <span class="badge bg-secondary">Stored Results</span>
+                </div>
+                <div class="card-body d-flex flex-column justify-content-center align-items-center">
+                    <div style="width: 220px; height: 220px; position: relative;">
+                        <canvas id="ppeComplianceChart"></canvas>
+                    </div>
+                    <div class="d-flex justify-content-around w-100 mt-3 pt-2 border-top border-secondary border-opacity-25 text-center">
+                        <div>
+                            <div class="small text-muted">Compliant</div>
+                            <div class="fw-bold text-success fs-5" id="compliance-count-compliant">0</div>
+                        </div>
+                        <div>
+                            <div class="small text-muted">Violations</div>
+                            <div class="fw-bold text-danger fs-5" id="compliance-count-violations">0</div>
+                        </div>
+                        <div>
+                            <div class="small text-muted">Total Checks</div>
+                            <div class="fw-bold text-light fs-5" id="compliance-count-total">0</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {# ---- Department Workforce Summary ---- #}
+    <div class="card mb-4">
+        <div class="card-header">
+            <h3 class="card-title">
+                <i data-lucide="building" class="text-info"></i>
+                Department Attendance Breakdown
+            </h3>
+            <span class="small text-muted">Shift Live Telemetry</span>
+        </div>
+        <div class="card-body">
+            <div class="row g-3" id="department-breakdown-cards">
+                {# Dynamically populated #}
+                <div class="col-12 text-center text-muted py-3">
+                    <div class="spinner-border spinner-border-sm text-info me-2" role="status"></div>
+                    Loading department telemetry...
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {# ---- Dual Activity Feeds: Attendance & Safety ---- #}
+    <div class="row g-4 mb-4">
+        {# Recent Attendance Activity #}
+        <div class="col-lg-6">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h3 class="card-title">
+                        <i data-lucide="clock" class="text-info"></i>
+                        Recent Attendance Activity
+                    </h3>
+                    <a href="{{ url_for('attendance.attendance_view') }}" class="btn btn-outline-secondary btn-sm">
+                        View All <i data-lucide="arrow-right" style="width: 13px; height: 13px;"></i>
+                    </a>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table align-middle">
+                            <thead>
+                                <tr>
+                                    <th>Employee</th>
+                                    <th>Department</th>
+                                    <th>Method</th>
+                                    <th>Time</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="recent-attendance-tbody">
+                                <tr>
+                                    <td colspan="5" class="text-center text-muted py-4">
+                                        <div class="spinner-border spinner-border-sm text-info me-2" role="status"></div>
+                                        Fetching attendance logs...
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {# Recent Safety Inspection Activity #}
+        <div class="col-lg-6">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h3 class="card-title">
+                        <i data-lucide="shield-alert" class="text-info"></i>
+                        Recent Safety Gear Inspections
+                    </h3>
+                    <a href="{{ url_for('safety_gear.safety_gear_view') }}" class="btn btn-outline-secondary btn-sm">
+                        Run Check <i data-lucide="arrow-right" style="width: 13px; height: 13px;"></i>
+                    </a>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table align-middle">
+                            <thead>
+                                <tr>
+                                    <th>Employee</th>
+                                    <th>Gear Detected</th>
+                                    <th>Score</th>
+                                    <th>Timestamp</th>
+                                    <th>Verdict</th>
+                                </tr>
+                            </thead>
+                            <tbody id="recent-safety-tbody">
+                                <tr>
+                                    <td colspan="5" class="text-center text-muted py-4">
+                                        <div class="spinner-border spinner-border-sm text-info me-2" role="status"></div>
+                                        Fetching inspection logs...
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    var attendanceChart = null;
+    var complianceChart = null;
+
+    // Load all real database analytics
+    function loadDashboardData() {
+        // 1. Fetch system status
+        fetch("/api/system-status")
+            .then(function (res) { return res.json(); })
+            .then(function (statusData) {
+                if (statusData.status === "ok") {
+                    document.getElementById("health-flask").textContent = "ONLINE";
+                    document.getElementById("health-db").className = statusData.database_healthy ? "badge bg-success" : "badge bg-danger";
+                    document.getElementById("health-db").textContent = statusData.database_healthy ? "CONNECTED" : "FAILED";
+                    
+                    document.getElementById("health-face").className = statusData.face_model_available ? "badge bg-success" : "badge bg-warning";
+                    document.getElementById("health-face").textContent = statusData.face_model_available ? "READY" : "OFFLINE";
+                    document.getElementById("health-face-model").textContent = statusData.face_model_type || "Unavailable";
+
+                    document.getElementById("health-ppe").className = statusData.ppe_model_available ? "badge bg-success" : "badge bg-warning";
+                    document.getElementById("health-ppe").textContent = statusData.ppe_model_available ? "ACTIVE" : "NO MODEL";
+                    document.getElementById("health-ppe-model").textContent = statusData.ppe_model_available ? "YOLOv8 weights/best.pt" : "Not configured";
+                }
+            })
+            .catch(function () {});
+
+        // 2. Fetch KPI stats
+        fetch("{{ url_for('dashboard.dashboard_stats') }}")
+            .then(function (res) { return res.json(); })
+            .then(function (stats) {
+                if (stats.status === "ok") {
+                    document.getElementById("kpi-total-employees").textContent = stats.total_employees !== undefined ? stats.total_employees : "--";
+                    document.getElementById("kpi-present-count").textContent = stats.present_count;
+                    document.getElementById("kpi-absent-count").textContent = stats.absent_count !== undefined ? stats.absent_count : "--";
+                    document.getElementById("kpi-attendance-pct").textContent = (stats.attendance_percentage !== undefined ? stats.attendance_percentage : 0) + "%";
+                    document.getElementById("kpi-ppe-checks").textContent = stats.total_ppe_checks !== undefined ? stats.total_ppe_checks : 0;
+                    document.getElementById("kpi-ppe-today").textContent = "Today: " + (stats.todays_ppe_checks !== undefined ? stats.todays_ppe_checks : 0);
+                    document.getElementById("kpi-compliance-rate").textContent = stats.compliance_rate + "%";
+                }
+            })
+            .catch(function () {});
+
+        // 3. Fetch comprehensive analytics (charts, departments, activity feeds)
+        fetch("{{ url_for('dashboard.dashboard_analytics') }}")
+            .then(function (res) { return res.json(); })
+            .then(function (analytics) {
+                if (analytics.status === "ok") {
+                    renderAttendanceTrendChart(analytics.trend_labels, analytics.trend_counts);
+                    renderComplianceChart(analytics.compliance);
+                    renderDepartmentCards(analytics.departments);
+                    renderRecentAttendance(analytics.recent_attendance);
+                    renderRecentSafety(analytics.recent_safety);
+                    if (window.lucide) { lucide.createIcons(); }
+                }
+            })
+            .catch(function (err) {
+                console.error("Failed to load analytics:", err);
+            });
+    }
+
+    // Chart.js 7-Day Trend Line Chart
+    function renderAttendanceTrendChart(labels, data) {
+        var ctx = document.getElementById("attendanceTrendChart");
+        if (!ctx) return;
+
+        if (attendanceChart) {
+            attendanceChart.destroy();
+        }
+
+        var isZero = data.every(function(v) { return v === 0; });
+
+        attendanceChart = new Chart(ctx, {
+            type: "line",
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: "Daily Check-Ins",
+                    data: data,
+                    borderColor: "#06b6d4",
+                    backgroundColor: "rgba(6, 182, 212, 0.12)",
+                    borderWidth: 3,
+                    fill: true,
+                    tension: 0.35,
+                    pointBackgroundColor: "#06b6d4",
+                    pointBorderColor: "#ffffff",
+                    pointRadius: 5,
+                    pointHoverRadius: 7
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        backgroundColor: "rgba(15, 23, 42, 0.95)",
+                        borderColor: "rgba(6, 182, 212, 0.4)",
+                        borderWidth: 1,
+                        padding: 10,
+                        titleColor: "#ffffff",
+                        bodyColor: "#94a3b8"
+                    }
+                },
+                scales: {
+                    x: {
+                        grid: { color: "rgba(255, 255, 255, 0.05)" },
+                        ticks: { color: "#94a3b8", font: { family: "Plus Jakarta Sans" } }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        ticks: { stepSize: 1, color: "#94a3b8", font: { family: "JetBrains Mono" } },
+                        grid: { color: "rgba(255, 255, 255, 0.05)" }
+                    }
+                }
+            }
+        });
+    }
+
+    // Chart.js Doughnut Chart for PPE Compliance
+    function renderComplianceChart(comp) {
+        var ctx = document.getElementById("ppeComplianceChart");
+        if (!ctx) return;
+
+        if (complianceChart) {
+            complianceChart.destroy();
+        }
+
+        document.getElementById("compliance-count-compliant").textContent = comp.compliant || 0;
+        document.getElementById("compliance-count-violations").textContent = comp.non_compliant || 0;
+        document.getElementById("compliance-count-total").textContent = comp.total_checks || 0;
+
+        var hasData = comp.total_checks > 0;
+        var chartData = hasData ? [comp.compliant, comp.non_compliant] : [0, 0];
+        var chartColors = hasData ? ["#10b981", "#ef4444"] : ["rgba(255,255,255,0.05)", "rgba(255,255,255,0.05)"];
+
+        complianceChart = new Chart(ctx, {
+            type: "doughnut",
+            data: {
+                labels: ["Compliant", "Violations"],
+                datasets: [{
+                    data: hasData ? chartData : [1],
+                    backgroundColor: hasData ? chartColors : ["rgba(255,255,255,0.1)"],
+                    borderColor: "transparent",
+                    borderWidth: 2,
+                    hoverOffset: 4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                cutout: "75%",
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        enabled: hasData,
+                        backgroundColor: "rgba(15, 23, 42, 0.95)",
+                        borderColor: "rgba(255, 255, 255, 0.1)",
+                        borderWidth: 1
+                    }
+                }
+            }
+        });
+    }
+
+    // Render Department Cards
+    function renderDepartmentCards(departments) {
+        var container = document.getElementById("department-breakdown-cards");
+        if (!container || !departments) return;
+
+        if (departments.length === 0) {
+            container.innerHTML = '<div class="col-12 text-center text-muted py-3">No departments configured.</div>';
+            return;
+        }
+
+        var html = "";
+        departments.forEach(function (dept) {
+            html += '<div class="col-md-4 col-lg-2-4 col-sm-6">' +
+                '<div class="p-3 rounded border border-secondary border-opacity-25" style="background: rgba(255, 255, 255, 0.02);">' +
+                    '<div class="d-flex justify-content-between align-items-center mb-1">' +
+                        '<span class="fw-semibold text-light text-truncate">' + escapeHtml(dept.department) + '</span>' +
+                        '<span class="badge bg-secondary font-monospace">' + dept.present + '/' + dept.total + '</span>' +
+                    '</div>' +
+                    '<div class="progress" style="height: 6px; background: rgba(255,255,255,0.08);">' +
+                        '<div class="progress-bar bg-info" style="width: ' + dept.rate + '%;"></div>' +
+                    '</div>' +
+                    '<div class="d-flex justify-content-between align-items-center mt-2 small text-muted font-monospace">' +
+                        '<span>Attendance</span>' +
+                        '<span class="text-info fw-bold">' + dept.rate + '%</span>' +
+                    '</div>' +
+                '</div>' +
+            '</div>';
+        });
+        container.innerHTML = html;
+    }
+
+    // Render Recent Attendance Table
+    function renderRecentAttendance(records) {
+        var tbody = document.getElementById("recent-attendance-tbody");
+        if (!tbody) return;
+
+        if (!records || records.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-4">No attendance activity recorded yet. Records will populate upon check-ins.</td></tr>';
+            return;
+        }
+
+        var html = "";
+        records.forEach(function (rec) {
+            var methodBadge = rec.attendance_method === "face_recognition"
+                ? '<span class="badge bg-primary"><i data-lucide="scan" style="width:11px;height:11px;" class="me-1"></i>Face AI</span>'
+                : '<span class="badge bg-secondary">Manual</span>';
+
+            var timeDisplay = rec.check_in_time ? new Date(rec.check_in_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "-";
+
+            html += '<tr>' +
+                '<td>' +
+                    '<div class="fw-semibold text-light">' + escapeHtml(rec.employee_name) + '</div>' +
+                    '<div class="small text-muted font-monospace">' + escapeHtml(rec.employee_id) + '</div>' +
+                '</td>' +
+                '<td>' + escapeHtml(rec.department) + '</td>' +
+                '<td>' + methodBadge + '</td>' +
+                '<td class="font-monospace text-secondary">' + timeDisplay + '</td>' +
+                '<td><span class="badge ' + (rec.status === 'present' ? 'bg-success' : 'bg-warning') + '">' + escapeHtml(rec.status) + '</span></td>' +
+            '</tr>';
+        });
+        tbody.innerHTML = html;
+    }
+
+    // Render Recent Safety Inspections Table
+    function renderRecentSafety(records) {
+        var tbody = document.getElementById("recent-safety-tbody");
+        if (!tbody) return;
+
+        if (!records || records.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-4">No safety checks conducted yet. Upload an inspection image to start monitoring.</td></tr>';
+            return;
+        }
+
+        var html = "";
+        records.forEach(function (sec) {
+            var gearList = [];
+            if (sec.helmet_detected) gearList.push('<span class="badge bg-success me-1">Helmet</span>');
+            if (sec.vest_detected) gearList.push('<span class="badge bg-success me-1">Vest</span>');
+            if (sec.boots_detected) gearList.push('<span class="badge bg-success me-1">Boots</span>');
+            if (sec.gloves_detected) gearList.push('<span class="badge bg-info me-1">Gloves</span>');
+            var gearDisplay = gearList.length > 0 ? gearList.join("") : '<span class="text-muted small">None</span>';
+
+            var scoreDisplay = sec.confidence_score ? sec.confidence_score.toFixed(1) + "%" : "-";
+            var timeDisplay = sec.check_time ? new Date(sec.check_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "-";
+            var verdictBadge = sec.is_compliant
+                ? '<span class="badge bg-success"><i data-lucide="check" style="width:11px;height:11px;" class="me-1"></i>PASS</span>'
+                : '<span class="badge bg-danger"><i data-lucide="x" style="width:11px;height:11px;" class="me-1"></i>FAIL</span>';
+
+            html += '<tr>' +
+                '<td>' +
+                    '<div class="fw-semibold text-light">' + escapeHtml(sec.employee_name) + '</div>' +
+                    '<div class="small text-muted font-monospace">' + escapeHtml(sec.employee_id) + '</div>' +
+                '</td>' +
+                '<td>' + gearDisplay + '</td>' +
+                '<td class="font-monospace text-info">' + scoreDisplay + '</td>' +
+                '<td class="font-monospace text-secondary">' + timeDisplay + '</td>' +
+                '<td>' + verdictBadge + '</td>' +
+            '</tr>';
+        });
+        tbody.innerHTML = html;
+    }
+
+    document.addEventListener("DOMContentLoaded", function () {
+        loadDashboardData();
+        var refreshBtn = document.getElementById("refresh-dashboard-btn");
+        if (refreshBtn) {
+            refreshBtn.addEventListener("click", function () {
+                refreshBtn.disabled = true;
+                refreshBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Refreshing...';
+                loadDashboardData();
+                setTimeout(function () {
+                    refreshBtn.disabled = false;
+                    refreshBtn.innerHTML = '<i data-lucide="refresh-cw" style="width: 14px; height: 14px;"></i> Refresh Telemetry';
+                    if (window.lucide) { lucide.createIcons(); }
+                }, 800);
+            });
+        }
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,342 @@
+{# attendance.html #}
+{# SmartFactoryAttendance — Attendance Tracking & Records Historical Archive #}
+
+{% extends "base.html" %}
+
+{% block title %}Attendance Management &amp; Historical Records - Smart Factory Attendance{% endblock %}
+{% block page_title %}Attendance Management &amp; Records Archive{% endblock %}
+
+{% block content %}
+<section class="attendance fade-in-up">
+    {# ---- Page Header ---- #}
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
+        <div>
+            <h2 class="h4 fw-bold text-light mb-1">
+                <i data-lucide="clipboard-check" class="d-inline-block text-info me-2" style="width: 24px; height: 24px;"></i>
+                Factory Attendance Records &amp; Manual Station
+            </h2>
+            <p class="text-secondary small mb-0">Track shift check-in / check-out timestamps, biometric vs manual methods, and export operational audits</p>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+            <a href="{{ url_for('face_attendance.face_attendance_view') }}" class="btn btn-outline-primary btn-sm">
+                <i data-lucide="scan-face" style="width: 14px; height: 14px;"></i> Open Face AI Station
+            </a>
+            <button type="button" class="btn btn-primary btn-sm" onclick="exportAttendanceCSV()">
+                <i data-lucide="download" style="width: 14px; height: 14px;"></i> Export CSV Audit Log
+            </button>
+        </div>
+    </div>
+
+    {# ---- Top Controls Grid ---- #}
+    <div class="row g-4 mb-4">
+        {# Left: Manual Check-In / Check-Out Station #}
+        <div class="col-lg-4">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h3 class="card-title">
+                        <i data-lucide="clock" class="text-info"></i>
+                        Manual Action Console
+                    </h3>
+                    <span class="badge bg-secondary font-monospace">Manual Fallback</span>
+                </div>
+                <div class="card-body">
+                    <form id="attendance-form" autocomplete="off">
+                        <div class="mb-3">
+                            <label for="employee-id" class="form-label fw-bold">Select or Enter Worker ID</label>
+                            <select class="form-select mb-2" id="employee-quick-select" onchange="syncManualInput(this.value)">
+                                <option value="" selected>-- Pick from Registered Workers --</option>
+                                {% if employees %}
+                                    {% for emp in employees %}
+                                        <option value="{{ emp.employee_id }}">
+                                            {{ emp.employee_id }} &mdash; {{ emp.first_name }} {{ emp.last_name }} ({{ emp.department }})
+                                        </option>
+                                    {% endfor %}
+                                {% endif %}
+                            </select>
+                            <input type="text" class="form-control font-monospace" id="employee-id" name="employee_id"
+                                   placeholder="e.g. PRD-0001" required>
+                        </div>
+
+                        <div class="d-grid gap-2 mb-3">
+                            <button type="button" class="btn btn-success" id="checkin-btn">
+                                <i data-lucide="log-in" style="width: 16px; height: 16px;"></i> Record Check-In
+                            </button>
+                            <button type="button" class="btn btn-danger" id="checkout-btn">
+                                <i data-lucide="log-out" style="width: 16px; height: 16px;"></i> Record Check-Out
+                            </button>
+                        </div>
+
+                        <div id="attendance-result" class="mt-2"></div>
+
+                        <div class="p-3 rounded mt-3" style="background: rgba(6, 182, 212, 0.05); border: 1px solid var(--border-accent);">
+                            <div class="small text-info fw-semibold mb-1">
+                                <i data-lucide="zap" style="width: 13px; height: 13px;"></i> Biometric Automation Available
+                            </div>
+                            <div class="small text-muted">
+                                Manual recording logs attendance with <code>method = 'manual'</code>. For facial recognition verification, launch <a href="{{ url_for('face_attendance.face_attendance_view') }}">Face Attendance</a>.
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        {# Right: Search & Filters for Records #}
+        <div class="col-lg-8">
+            <div class="card h-100">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h3 class="card-title">
+                        <i data-lucide="filter" class="text-info"></i>
+                        Filter &amp; Query Attendance Records
+                    </h3>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" onclick="resetFilters()">
+                        <i data-lucide="rotate-ccw" style="width: 12px; height: 12px;"></i> Reset
+                    </button>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-4">
+                            <label class="form-label" for="filter-date">Filter by Specific Date</label>
+                            <input type="date" class="form-control" id="filter-date" onchange="loadRecords()">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label" for="filter-worker-id">Worker Identifier</label>
+                            <input type="text" class="form-control font-monospace" id="filter-worker-id"
+                                   placeholder="Filter by ID (e.g. PRD-0001)" oninput="debouncedLoadRecords()">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label" for="filter-method">Verification Method</label>
+                            <select class="form-select" id="filter-method" onchange="filterLocalTable()">
+                                <option value="">All Verification Methods</option>
+                                <option value="face_recognition">Face Recognition AI</option>
+                                <option value="manual">Manual Entry</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-between align-items-center p-3 rounded" style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-subtle);">
+                        <div class="small text-muted">
+                            Matching Logs: <strong class="text-info font-monospace" id="record-count-display">0</strong> records
+                        </div>
+                        <div class="d-flex gap-3 small font-monospace">
+                            <span class="text-success"><i data-lucide="check-circle" style="width: 12px; height: 12px;"></i> Present: <strong id="present-count-display">0</strong></span>
+                            <span class="text-info"><i data-lucide="scan" style="width: 12px; height: 12px;"></i> Face AI: <strong id="face-count-display">0</strong></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {# ---- Comprehensive Attendance Records Table ---- #}
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h3 class="card-title">
+                <i data-lucide="database" class="text-info"></i>
+                Historical Attendance Log
+            </h3>
+            <span class="small text-muted font-monospace">Sorted by Latest Timestamp</span>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table align-middle" id="attendanceRecordsTable">
+                    <thead>
+                        <tr>
+                            <th>Record ID</th>
+                            <th>Worker ID</th>
+                            <th>Employee Name</th>
+                            <th>Department</th>
+                            <th>Date</th>
+                            <th>Check-In Time</th>
+                            <th>Check-Out Time</th>
+                            <th>Method</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="records-table-body">
+                        <tr>
+                            <td colspan="9" class="text-center text-muted py-5">
+                                <div class="spinner-border spinner-border-sm text-info me-2" role="status"></div>
+                                Loading attendance records from database...
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    var debounceTimer = null;
+    var allLoadedRecords = [];
+
+    function syncManualInput(val) {
+        if (val) {
+            document.getElementById("employee-id").value = val;
+        }
+    }
+
+    function statusBadgeClass(status) {
+        var map = {
+            "present": "bg-success",
+            "late": "bg-warning text-dark",
+            "absent": "bg-danger"
+        };
+        return map[status] || "bg-secondary";
+    }
+
+    function methodBadge(method) {
+        if (method === "face_recognition") {
+            return '<span class="badge bg-primary d-inline-flex align-items-center gap-1"><i data-lucide="scan" style="width:11px;height:11px;"></i> Face AI</span>';
+        }
+        return '<span class="badge bg-secondary">Manual</span>';
+    }
+
+    function debouncedLoadRecords() {
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(loadRecords, 350);
+    }
+
+    function resetFilters() {
+        document.getElementById("filter-date").value = "";
+        document.getElementById("filter-worker-id").value = "";
+        document.getElementById("filter-method").value = "";
+        loadRecords();
+    }
+
+    function exportAttendanceCSV() {
+        var dateVal = document.getElementById("filter-date").value;
+        var empVal = document.getElementById("filter-worker-id").value.trim();
+        var url = "{{ url_for('attendance.export_csv') }}";
+        var params = [];
+        if (dateVal) params.push("date=" + encodeURIComponent(dateVal));
+        if (empVal) params.push("employee_id=" + encodeURIComponent(empVal));
+        if (params.length > 0) {
+            url += "?" + params.join("&");
+        }
+        window.location.href = url;
+    }
+
+    function filterLocalTable() {
+        var methodFilter = document.getElementById("filter-method").value;
+        var filtered = allLoadedRecords.filter(function (r) {
+            return !methodFilter || r.attendance_method === methodFilter;
+        });
+        renderTable(filtered);
+    }
+
+    function loadRecords() {
+        var dateVal = document.getElementById("filter-date").value;
+        var empVal = document.getElementById("filter-worker-id").value.trim();
+
+        var url = "{{ url_for('attendance.get_records') }}";
+        var params = [];
+        if (dateVal) params.push("date=" + encodeURIComponent(dateVal));
+        if (empVal) params.push("employee_id=" + encodeURIComponent(empVal));
+        if (params.length > 0) url += "?" + params.join("&");
+
+        fetch(url)
+            .then(function (res) { return res.json(); })
+            .then(function (data) {
+                if (data.status === "ok") {
+                    allLoadedRecords = data.records || [];
+                    filterLocalTable();
+                } else {
+                    document.getElementById("records-table-body").innerHTML =
+                        '<tr><td colspan="9" class="text-center text-danger py-4">' + escapeHtml(data.message) + '</td></tr>';
+                }
+            })
+            .catch(function () {
+                document.getElementById("records-table-body").innerHTML =
+                    '<tr><td colspan="9" class="text-center text-muted py-4">Unable to load attendance records at this time.</td></tr>';
+            });
+    }
+
+    function renderTable(records) {
+        var tbody = document.getElementById("records-table-body");
+        document.getElementById("record-count-display").textContent = records.length;
+
+        var presentCount = 0;
+        var faceCount = 0;
+
+        if (records.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted py-5">No attendance logs matching the current criteria.</td></tr>';
+            document.getElementById("present-count-display").textContent = 0;
+            document.getElementById("face-count-display").textContent = 0;
+            return;
+        }
+
+        var html = "";
+        records.forEach(function (record) {
+            if (record.status === "present") presentCount++;
+            if (record.attendance_method === "face_recognition") faceCount++;
+
+            html += '<tr>' +
+                '<td class="font-monospace text-muted">#' + record.id + '</td>' +
+                '<td class="font-monospace fw-bold text-info">' + escapeHtml(record.employee_id) + '</td>' +
+                '<td><span class="fw-semibold text-light">' + escapeHtml(record.employee_name || "Unknown") + '</span></td>' +
+                '<td><span class="badge bg-secondary">' + escapeHtml(record.department || "-") + '</span></td>' +
+                '<td class="font-monospace text-secondary">' + escapeHtml(record.date || "-") + '</td>' +
+                '<td class="font-monospace text-light">' + formatDateTime(record.check_in_time) + '</td>' +
+                '<td class="font-monospace text-light">' + formatDateTime(record.check_out_time) + '</td>' +
+                '<td>' + methodBadge(record.attendance_method) + '</td>' +
+                '<td><span class="badge ' + statusBadgeClass(record.status) + '">' + escapeHtml(record.status) + '</span></td>' +
+            '</tr>';
+        });
+
+        tbody.innerHTML = html;
+        document.getElementById("present-count-display").textContent = presentCount;
+        document.getElementById("face-count-display").textContent = faceCount;
+        if (window.lucide) { lucide.createIcons(); }
+    }
+
+    function submitAttendance(action) {
+        var empId = document.getElementById("employee-id").value.trim();
+        if (!empId) {
+            showAlert("attendance-result", "<i data-lucide='alert-triangle' class='me-1' style='width:16px;height:16px;'></i> Please enter or select a Worker ID.", "warning");
+            return;
+        }
+
+        var btn = action === "check-in" ? document.getElementById("checkin-btn") : document.getElementById("checkout-btn");
+        var origHtml = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Recording...';
+
+        var endpoint = action === "check-in" ? "{{ url_for('attendance.check_in') }}" : "{{ url_for('attendance.check_out') }}";
+        var fd = new FormData();
+        fd.append("employee_id", empId);
+
+        fetch(endpoint, { method: "POST", body: fd })
+            .then(function (res) { return res.json(); })
+            .then(function (data) {
+                btn.disabled = false;
+                btn.innerHTML = origHtml;
+
+                if (data.status === "ok") {
+                    showAlert("attendance-result",
+                        "<i data-lucide='check-circle-2' class='me-1' style='width:16px;height:16px;'></i> " +
+                        escapeHtml(data.message || "Recorded successfully.") + " &bull; Worker: <strong>" + escapeHtml(empId) + "</strong>", "success");
+                    loadRecords();
+                } else {
+                    showAlert("attendance-result",
+                        "<i data-lucide='alert-circle' class='me-1' style='width:16px;height:16px;'></i> " +
+                        escapeHtml(data.message || "Operation failed."), "danger");
+                }
+            })
+            .catch(function () {
+                btn.disabled = false;
+                btn.innerHTML = origHtml;
+                showAlert("attendance-result", "Network error recording attendance.", "danger");
+            });
+    }
+
+    document.addEventListener("DOMContentLoaded", function () {
+        loadRecords();
+        document.getElementById("checkin-btn").addEventListener("click", function () { submitAttendance("check-in"); });
+        document.getElementById("checkout-btn").addEventListener("click", function () { submitAttendance("check-out"); });
+    });
+</script>
+{% endblock %}

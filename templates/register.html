@@ -1,0 +1,401 @@
+{# register.html #}
+{# SmartFactoryAttendance — Employee Management & Biometric Registration Portal #}
+
+{% extends "base.html" %}
+
+{% block title %}Employee Registration - Smart Factory Attendance{% endblock %}
+{% block page_title %}Employee Registration &amp; Workforce Directory{% endblock %}
+
+{% block content %}
+<section class="workforce-management fade-in-up">
+    {# ---- Page Header ---- #}
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
+        <div>
+            <h2 class="h4 fw-bold text-light mb-1">
+                <i data-lucide="users" class="d-inline-block text-info me-2" style="width: 24px; height: 24px;"></i>
+                Employee Registration &amp; Workforce Directory
+            </h2>
+            <p class="text-secondary small mb-0">Manage personnel profiles, shift assignments, and facial biometric registration status</p>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#registerModal">
+                <i data-lucide="user-plus" style="width: 15px; height: 15px;"></i> Register New Worker
+            </button>
+        </div>
+    </div>
+
+    {# ---- Search, Filter & Telemetry Bar ---- #}
+    <div class="card mb-4">
+        <div class="card-body p-3">
+            <div class="row g-3 align-items-center">
+                {# Search input #}
+                <div class="col-md-4">
+                    <div class="input-group">
+                        <span class="input-group-text bg-transparent border-end-0 text-muted" style="border-color: var(--border-subtle);">
+                            <i data-lucide="search" style="width: 16px; height: 16px;"></i>
+                        </span>
+                        <input type="text" class="form-control border-start-0 ps-0" id="employeeSearchInput"
+                               placeholder="Search by ID, name, or department..." oninput="filterEmployeeTable()">
+                    </div>
+                </div>
+
+                {# Department filter #}
+                <div class="col-md-3">
+                    <select class="form-select" id="deptFilter" onchange="filterEmployeeTable()">
+                        <option value="">All Departments</option>
+                        <option value="Production">Production</option>
+                        <option value="Maintenance">Maintenance</option>
+                        <option value="Quality">Quality</option>
+                        <option value="Logistics">Logistics</option>
+                        <option value="Administration">Administration</option>
+                    </select>
+                </div>
+
+                {# Face Enrollment Status filter #}
+                <div class="col-md-3">
+                    <select class="form-select" id="faceFilter" onchange="filterEmployeeTable()">
+                        <option value="">All Biometric Statuses</option>
+                        <option value="enrolled">Face Enrolled</option>
+                        <option value="pending">Enrollment Pending</option>
+                    </select>
+                </div>
+
+                {# Stats counter #}
+                <div class="col-md-2 text-md-end text-muted small font-monospace">
+                    Showing: <span id="filtered-count" class="text-info fw-bold">{{ employees|length }}</span> of {{ employees|length }}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {# ---- Professional Employee Directory Table ---- #}
+    <div class="card mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h3 class="card-title">
+                <i data-lucide="id-card" class="text-info"></i>
+                Enrolled Personnel Directory
+            </h3>
+            <span class="small text-muted font-monospace">Live Database Records</span>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table align-middle" id="employeeDirectoryTable">
+                    <thead>
+                        <tr>
+                            <th>Worker ID</th>
+                            <th>Employee Details</th>
+                            <th>Department</th>
+                            <th>Shift</th>
+                            <th>Face Biometrics</th>
+                            <th>Status</th>
+                            <th class="text-end">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% if employees %}
+                            {% for emp in employees %}
+                                <tr class="employee-row"
+                                    data-id="{{ emp.employee_id|lower }}"
+                                    data-name="{{ (emp.first_name ~ ' ' ~ emp.last_name)|lower }}"
+                                    data-dept="{{ emp.department }}"
+                                    data-enrolled="{{ 'enrolled' if emp.face_encoding is not none else 'pending' }}">
+                                    <td>
+                                        <span class="font-monospace fw-bold text-info">{{ emp.employee_id }}</span>
+                                    </td>
+                                    <td>
+                                        <div class="d-flex align-items-center gap-2">
+                                            <div class="profile-avatar" style="width: 34px; height: 34px; font-size: 0.8rem;">
+                                                {{ emp.first_name[:1]|upper }}{{ emp.last_name[:1]|upper }}
+                                            </div>
+                                            <div>
+                                                <div class="fw-semibold text-light">{{ emp.first_name }} {{ emp.last_name }}</div>
+                                                <div class="small text-muted">ID #{{ emp.id }} &bull; Registered {{ emp.created_at.strftime('%b %d, %Y') if emp.created_at else '-' }}</div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-secondary">{{ emp.department }}</span>
+                                    </td>
+                                    <td>
+                                        <span class="badge" style="background: rgba(59, 130, 246, 0.15); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.3);">
+                                            {{ emp.shift }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        {% if emp.face_encoding is not none %}
+                                            <span class="badge bg-success d-inline-flex align-items-center gap-1">
+                                                <i data-lucide="check-circle" style="width: 12px; height: 12px;"></i> Enrolled
+                                            </span>
+                                        {% else %}
+                                            <span class="badge bg-warning d-inline-flex align-items-center gap-1">
+                                                <i data-lucide="alert-circle" style="width: 12px; height: 12px;"></i> Pending
+                                            </span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if emp.is_active %}
+                                            <span class="badge bg-success">Active</span>
+                                        {% else %}
+                                            <span class="badge bg-danger">Inactive</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-end">
+                                        <div class="btn-group btn-group-sm">
+                                            {# Enroll button if pending #}
+                                            <a href="{{ url_for('face_attendance.enroll') }}?employee_id={{ emp.employee_id }}"
+                                               class="btn btn-outline-primary btn-sm"
+                                               title="{{ 'Update Face Biometric' if emp.face_encoding is not none else 'Enroll Face Biometric' }}">
+                                                <i data-lucide="camera" style="width: 13px; height: 13px;"></i>
+                                                <span class="d-none d-md-inline">{{ 'Re-enroll' if emp.face_encoding is not none else 'Enroll Face' }}</span>
+                                            </a>
+                                            {# Profile view #}
+                                            <button type="button" class="btn btn-outline-secondary btn-sm"
+                                                    onclick="viewEmployeeDetails('{{ emp.employee_id }}', '{{ emp.first_name }} {{ emp.last_name }}', '{{ emp.department }}', '{{ emp.shift }}', {{ 'true' if emp.is_active else 'false' }}, {{ 'true' if emp.face_encoding is not none else 'false' }})">
+                                                <i data-lucide="eye" style="width: 13px; height: 13px;"></i>
+                                            </button>
+                                            {# Toggle Active status #}
+                                            <button type="button" class="btn btn-outline-secondary btn-sm"
+                                                    onclick="confirmStatusToggle({{ emp.id }}, '{{ emp.employee_id }}', {{ 'true' if emp.is_active else 'false' }})"
+                                                    title="{{ 'Deactivate Employee' if emp.is_active else 'Activate Employee' }}">
+                                                <i data-lucide="{{ 'user-minus' if emp.is_active else 'user-check' }}" style="width: 13px; height: 13px;"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        {% else %}
+                            <tr id="empty-row">
+                                <td colspan="7" class="text-center text-muted py-5">
+                                    <i data-lucide="users" class="display-5 text-muted mb-3 d-block mx-auto" style="width: 48px; height: 48px;"></i>
+                                    <p class="mb-2">No factory workers registered yet.</p>
+                                    <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#registerModal">
+                                        <i data-lucide="user-plus" style="width: 14px; height: 14px;"></i> Register First Worker
+                                    </button>
+                                </td>
+                            </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</section>
+
+{# ---- Modal: Register Worker Form ---- #}
+<div class="modal fade" id="registerModal" tabindex="-1" aria-labelledby="registerModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content" style="background: var(--bg-surface); border: 1px solid var(--border-accent); box-shadow: var(--shadow-card);">
+            <div class="modal-header border-bottom" style="border-color: var(--border-subtle) !important;">
+                <h5 class="modal-title fw-bold text-light" id="registerModalLabel">
+                    <i data-lucide="user-plus" class="text-info me-2 d-inline-block" style="width: 20px; height: 20px;"></i>
+                    Register Factory Employee
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form method="POST" action="{{ url_for('main.register') }}">
+                <div class="modal-body p-4">
+                    <div class="alert alert-info mb-4">
+                        <i data-lucide="info" class="me-1 d-inline-block" style="width: 16px; height: 16px;"></i>
+                        After registration, you will be automatically redirected to the live biometric camera station to enroll the worker's facial profile.
+                    </div>
+
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label for="first_name" class="form-label">First Name <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="first_name" name="first_name"
+                                   placeholder="e.g. Rahul" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="last_name" class="form-label">Last Name <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="last_name" name="last_name"
+                                   placeholder="e.g. Sharma" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="department" class="form-label">Department <span class="text-danger">*</span></label>
+                            <select class="form-select" id="department" name="department" required>
+                                <option value="" selected>Select department...</option>
+                                <option value="Production">Production</option>
+                                <option value="Maintenance">Maintenance</option>
+                                <option value="Quality">Quality</option>
+                                <option value="Logistics">Logistics</option>
+                                <option value="Administration">Administration</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="shift" class="form-label">Assigned Shift <span class="text-danger">*</span></label>
+                            <select class="form-select" id="shift" name="shift" required>
+                                <option value="" selected>Select shift...</option>
+                                <option value="Morning">Morning (06:00 - 14:00)</option>
+                                <option value="Afternoon">Afternoon (14:00 - 22:00)</option>
+                                <option value="Night">Night (22:00 - 06:00)</option>
+                            </select>
+                        </div>
+                        <div class="col-12">
+                            <label for="employee_id" class="form-label">
+                                Custom Worker ID <span class="text-muted small">(Leave empty for auto-generation e.g. PRD-0002)</span>
+                            </label>
+                            <input type="text" class="form-control font-monospace" id="employee_id" name="employee_id"
+                                   placeholder="e.g. PRD-0005">
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer border-top" style="border-color: var(--border-subtle) !important;">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i data-lucide="check" style="width: 15px; height: 15px;"></i> Register &amp; Proceed to Enrollment
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+{# ---- Modal: Employee Details Profile View ---- #}
+<div class="modal fade" id="detailsModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content" style="background: var(--bg-surface); border: 1px solid var(--border-accent);">
+            <div class="modal-header border-bottom" style="border-color: var(--border-subtle) !important;">
+                <h5 class="modal-title fw-bold text-light">Worker Profile Details</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4">
+                <div class="d-flex align-items-center gap-3 mb-4 pb-3 border-bottom" style="border-color: var(--border-subtle) !important;">
+                    <div class="profile-avatar" id="modal-avatar" style="width: 52px; height: 52px; font-size: 1.25rem;">--</div>
+                    <div>
+                        <h4 class="h5 fw-bold text-light mb-0" id="modal-name">--</h4>
+                        <span class="font-monospace text-info small" id="modal-emp-id">--</span>
+                    </div>
+                </div>
+                <dl class="row mb-0">
+                    <dt class="col-sm-5 text-muted">Department:</dt>
+                    <dd class="col-sm-7 fw-semibold text-light" id="modal-dept">--</dd>
+
+                    <dt class="col-sm-5 text-muted">Shift:</dt>
+                    <dd class="col-sm-7 fw-semibold text-light" id="modal-shift">--</dd>
+
+                    <dt class="col-sm-5 text-muted">Biometric Status:</dt>
+                    <dd class="col-sm-7" id="modal-face-status">--</dd>
+
+                    <dt class="col-sm-5 text-muted">Employment State:</dt>
+                    <dd class="col-sm-7" id="modal-active-status">--</dd>
+                </dl>
+            </div>
+            <div class="modal-footer border-top" style="border-color: var(--border-subtle) !important;">
+                <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+                <a href="#" id="modal-enroll-link" class="btn btn-primary btn-sm">
+                    <i data-lucide="camera" style="width: 14px; height: 14px;"></i> Open Biometric Enrollment
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+{# ---- Modal: Confirm Destructive / Status Action ---- #}
+<div class="modal fade" id="confirmToggleModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content" style="background: var(--bg-surface); border: 1px solid var(--border-subtle);">
+            <div class="modal-body p-4 text-center">
+                <i data-lucide="alert-triangle" class="text-warning mb-3" style="width: 44px; height: 44px;"></i>
+                <h5 class="fw-bold text-light mb-2">Confirm Status Change</h5>
+                <p class="small text-secondary mb-4" id="confirmToggleMessage">Are you sure you want to change this worker's status?</p>
+                <div class="d-flex justify-content-center gap-2">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary btn-sm" id="confirmToggleBtn">Confirm Action</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    var currentToggleEmpId = null;
+
+    // Filter employee table in real-time
+    function filterEmployeeTable() {
+        var searchTerm = document.getElementById("employeeSearchInput").value.toLowerCase().trim();
+        var deptTerm = document.getElementById("deptFilter").value;
+        var faceTerm = document.getElementById("faceFilter").value;
+
+        var rows = document.querySelectorAll(".employee-row");
+        var visibleCount = 0;
+
+        rows.forEach(function (row) {
+            var empId = row.getAttribute("data-id") || "";
+            var empName = row.getAttribute("data-name") || "";
+            var empDept = row.getAttribute("data-dept") || "";
+            var empEnrolled = row.getAttribute("data-enrolled") || "";
+
+            var matchesSearch = !searchTerm || empId.indexOf(searchTerm) !== -1 || empName.indexOf(searchTerm) !== -1 || empDept.toLowerCase().indexOf(searchTerm) !== -1;
+            var matchesDept = !deptTerm || empDept === deptTerm;
+            var matchesFace = !faceTerm || empEnrolled === faceTerm;
+
+            if (matchesSearch && matchesDept && matchesFace) {
+                row.style.display = "";
+                visibleCount++;
+            } else {
+                row.style.display = "none";
+            }
+        });
+
+        document.getElementById("filtered-count").textContent = visibleCount;
+    }
+
+    // View details modal
+    function viewEmployeeDetails(empId, name, dept, shift, isActive, isEnrolled) {
+        document.getElementById("modal-emp-id").textContent = empId;
+        document.getElementById("modal-name").textContent = name;
+        document.getElementById("modal-dept").textContent = dept;
+        document.getElementById("modal-shift").textContent = shift;
+        document.getElementById("modal-avatar").textContent = name.split(" ").map(function(n) { return n[0]; }).join("").toUpperCase();
+
+        document.getElementById("modal-face-status").innerHTML = isEnrolled
+            ? '<span class="badge bg-success">Face Biometric Enrolled</span>'
+            : '<span class="badge bg-warning">Enrollment Pending</span>';
+
+        document.getElementById("modal-active-status").innerHTML = isActive
+            ? '<span class="badge bg-success">Active Worker</span>'
+            : '<span class="badge bg-danger">Deactivated</span>';
+
+        document.getElementById("modal-enroll-link").href = "{{ url_for('face_attendance.enroll') }}?employee_id=" + encodeURIComponent(empId);
+
+        var modal = new bootstrap.Modal(document.getElementById("detailsModal"));
+        modal.show();
+        if (window.lucide) { lucide.createIcons(); }
+    }
+
+    // Confirm status toggle
+    function confirmStatusToggle(empDbId, empIdStr, currentActive) {
+        currentToggleEmpId = empDbId;
+        var action = currentActive ? "deactivate" : "activate";
+        document.getElementById("confirmToggleMessage").textContent =
+            "Are you sure you want to " + action + " employee " + empIdStr + "?";
+
+        var modal = new bootstrap.Modal(document.getElementById("confirmToggleModal"));
+        modal.show();
+        if (window.lucide) { lucide.createIcons(); }
+    }
+
+    document.getElementById("confirmToggleBtn").addEventListener("click", function () {
+        if (!currentToggleEmpId) return;
+        var btn = this;
+        btn.disabled = true;
+
+        fetch("/employee/" + currentToggleEmpId + "/toggle-status", { method: "POST" })
+            .then(function (res) { return res.json(); })
+            .then(function (data) {
+                btn.disabled = false;
+                if (data.status === "ok") {
+                    window.location.reload();
+                } else {
+                    alert(data.message || "Failed to update status.");
+                }
+            })
+            .catch(function () {
+                btn.disabled = false;
+                alert("Network error.");
+            });
+    });
+</script>
+{% endblock %}

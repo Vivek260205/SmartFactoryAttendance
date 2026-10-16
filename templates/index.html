@@ -1,0 +1,226 @@
+{# index.html #}
+{# SmartFactoryAttendance — Industrial AI Operational Portal #}
+
+{% extends "base.html" %}
+
+{% block title %}Smart Factory Attendance &amp; PPE Safety Monitoring{% endblock %}
+{% block page_title %}Plant Operations Portal{% endblock %}
+
+{% block content %}
+<section class="portal-home fade-in-up">
+    {# ---- Hero Section ---- #}
+    <div class="hero">
+        <div class="row align-items-center">
+            <div class="col-lg-8">
+                <div class="d-inline-flex align-items-center gap-2 px-3 py-1 rounded-pill mb-3" style="background: rgba(6, 182, 212, 0.12); border: 1px solid rgba(6, 182, 212, 0.3);">
+                    <div class="pulse-indicator" style="width: 7px; height: 7px;"></div>
+                    <span class="small fw-semibold text-info text-uppercase font-monospace">Autonomous Industrial Safety &amp; Biometrics</span>
+                </div>
+                <h1 class="display-5 fw-bold text-light mb-3" style="letter-spacing: -0.02em;">
+                    Smart Factory Attendance &amp; PPE Safety Monitoring System
+                </h1>
+                <p class="lead text-secondary mb-4" style="max-width: 650px; font-size: 1.05rem;">
+                    Enterprise-grade factory operations platform powered by <strong>OpenCV YuNet</strong> facial biometrics and <strong>Ultralytics YOLOv8</strong> personal protective equipment (PPE) compliance detection.
+                </p>
+                <div class="hero-actions">
+                    <a href="{{ url_for('dashboard.dashboard_view') }}" class="btn btn-primary btn-lg">
+                        <i data-lucide="layout-dashboard"></i> Open Dashboard
+                    </a>
+                    <a href="{{ url_for('face_attendance.face_attendance_view') }}" class="btn btn-outline-primary btn-lg">
+                        <i data-lucide="scan-face"></i> Face Attendance
+                    </a>
+                    <a href="{{ url_for('safety_gear.safety_gear_view') }}" class="btn btn-outline-secondary btn-lg">
+                        <i data-lucide="hard-hat"></i> PPE Safety Check
+                    </a>
+                    <a href="{{ url_for('main.auto_attendance') }}" class="btn btn-outline-secondary btn-lg">
+                        <i data-lucide="monitor"></i> Kiosk Station
+                    </a>
+                </div>
+            </div>
+            <div class="col-lg-4 d-none d-lg-block text-center">
+                <div class="p-4 rounded-4" style="background: rgba(6, 182, 212, 0.04); border: 1px solid var(--border-accent); box-shadow: var(--shadow-glow-cyan);">
+                    <i data-lucide="shield-check" class="text-info mb-3" style="width: 64px; height: 64px;"></i>
+                    <h4 class="h5 fw-bold text-light mb-1">AI Safety Shield Active</h4>
+                    <p class="small text-muted mb-3">Monitoring Helmet, Vest &amp; Boots compliance with strict neural inference</p>
+                    <div class="d-flex justify-content-center gap-2">
+                        <span class="badge bg-success">YuNet ONNX</span>
+                        <span class="badge bg-primary">YOLOv8 best.pt</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {# ---- Real Database KPIs (via /dashboard/home-stats) ---- #}
+    <div class="mb-5">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h2 class="section-title mb-0">
+                <i data-lucide="activity" class="text-info"></i>
+                Today's Operational Summary
+            </h2>
+            <span class="small text-muted font-monospace">Live Plant Database Telemetry</span>
+        </div>
+        <div class="row g-3">
+            <div class="col-6 col-md-3">
+                <div class="stat-card">
+                    <div class="stat-top">
+                        <span class="stat-label">Active Employees</span>
+                        <div class="stat-icon-wrapper blue">
+                            <i data-lucide="users"></i>
+                        </div>
+                    </div>
+                    <div class="stat-value" id="stat-total-employees">--</div>
+                    <div class="stat-meta">Registered Workforce</div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="stat-card">
+                    <div class="stat-top">
+                        <span class="stat-label">Today's Check-Ins</span>
+                        <div class="stat-icon-wrapper green">
+                            <i data-lucide="user-check"></i>
+                        </div>
+                    </div>
+                    <div class="stat-value text-success" id="stat-todays-attendance">--</div>
+                    <div class="stat-meta">Attendance Logged</div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="stat-card">
+                    <div class="stat-top">
+                        <span class="stat-label">Compliant Checks</span>
+                        <div class="stat-icon-wrapper cyan">
+                            <i data-lucide="shield-check"></i>
+                        </div>
+                    </div>
+                    <div class="stat-value text-info" id="stat-ppe-compliant">--</div>
+                    <div class="stat-meta">Full Gear Confirmed</div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="stat-card">
+                    <div class="stat-top">
+                        <span class="stat-label">PPE Violations</span>
+                        <div class="stat-icon-wrapper red">
+                            <i data-lucide="shield-alert"></i>
+                        </div>
+                    </div>
+                    <div class="stat-value text-danger" id="stat-ppe-violations">--</div>
+                    <div class="stat-meta">Missing Critical Gear</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {# ---- Operational Modules Hub ---- #}
+    <div class="mb-5">
+        <h2 class="section-title">
+            <i data-lucide="layers" class="text-info"></i>
+            Integrated Factory Modules
+        </h2>
+        <div class="row g-4">
+            {# Module 1 #}
+            <div class="col-md-6 col-lg-4">
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i data-lucide="scan-face"></i>
+                    </div>
+                    <h3>Face Biometric Attendance</h3>
+                    <p>Live camera capture and automatic Euclidean distance matching against enrolled worker encodings with zero manual delay.</p>
+                    <a href="{{ url_for('face_attendance.face_attendance_view') }}" class="btn btn-sm btn-outline-primary mt-auto">
+                        Launch Station <i data-lucide="arrow-right" style="width: 13px; height: 13px;"></i>
+                    </a>
+                </div>
+            </div>
+
+            {# Module 2 #}
+            <div class="col-md-6 col-lg-4">
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i data-lucide="monitor-play"></i>
+                    </div>
+                    <h3>Automated Kiosk Terminal</h3>
+                    <p>Continuous frame analysis for automated walk-by attendance with cooldown protection, single-face validation, and auto-checkout.</p>
+                    <a href="{{ url_for('main.auto_attendance') }}" class="btn btn-sm btn-outline-primary mt-auto">
+                        Launch Kiosk <i data-lucide="arrow-right" style="width: 13px; height: 13px;"></i>
+                    </a>
+                </div>
+            </div>
+
+            {# Module 3 #}
+            <div class="col-md-6 col-lg-4">
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i data-lucide="hard-hat"></i>
+                    </div>
+                    <h3>YOLO PPE Safety Vision</h3>
+                    <p>Inspect uploaded worker photographs with real YOLOv8 object detection, bounding-box annotations, and per-class confidence scoring.</p>
+                    <a href="{{ url_for('safety_gear.safety_gear_view') }}" class="btn btn-sm btn-outline-primary mt-auto">
+                        Inspect Gear <i data-lucide="arrow-right" style="width: 13px; height: 13px;"></i>
+                    </a>
+                </div>
+            </div>
+
+            {# Module 4 #}
+            <div class="col-md-6 col-lg-4">
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i data-lucide="users"></i>
+                    </div>
+                    <h3>Workforce &amp; Biometrics</h3>
+                    <p>Register employees, manage departmental shifts, track biometric enrollment status, and maintain active rosters.</p>
+                    <a href="{{ url_for('main.register') }}" class="btn btn-sm btn-outline-primary mt-auto">
+                        Manage Workers <i data-lucide="arrow-right" style="width: 13px; height: 13px;"></i>
+                    </a>
+                </div>
+            </div>
+
+            {# Module 5 #}
+            <div class="col-md-6 col-lg-4">
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i data-lucide="clipboard-list"></i>
+                    </div>
+                    <h3>Attendance Logs &amp; History</h3>
+                    <p>Comprehensive historical logs with check-in/out timestamps, attendance method verification (Face AI vs. Manual), and CSV exports.</p>
+                    <a href="{{ url_for('attendance.attendance_view') }}" class="btn btn-sm btn-outline-primary mt-auto">
+                        View Records <i data-lucide="arrow-right" style="width: 13px; height: 13px;"></i>
+                    </a>
+                </div>
+            </div>
+
+            {# Module 6 #}
+            <div class="col-md-6 col-lg-4">
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i data-lucide="log-out"></i>
+                    </div>
+                    <h3>Shift Check-Out Station</h3>
+                    <p>Dedicated check-out terminal for shift handover, status verification, and overtime tracking.</p>
+                    <a href="{{ url_for('attendance.check_out_view') }}" class="btn btn-sm btn-outline-primary mt-auto">
+                        Check-Out Station <i data-lucide="arrow-right" style="width: 13px; height: 13px;"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        fetch("{{ url_for('dashboard.home_stats') }}")
+            .then(function (res) { return res.json(); })
+            .then(function (data) {
+                if (data.status === "ok") {
+                    document.getElementById("stat-total-employees").textContent = data.total_employees;
+                    document.getElementById("stat-todays-attendance").textContent = data.todays_attendance;
+                    document.getElementById("stat-ppe-compliant").textContent = data.ppe_compliant;
+                    document.getElementById("stat-ppe-violations").textContent = data.ppe_violations;
+                }
+            })
+            .catch(function () {});
+    });
+</script>
+{% endblock %}

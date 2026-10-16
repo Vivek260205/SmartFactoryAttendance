@@ -1,0 +1,281 @@
+{# check_out.html #}
+{# SmartFactoryAttendance — Dedicated Worker Shift Check-Out Terminal #}
+
+{% extends "base.html" %}
+
+{% block title %}Shift Check-Out Terminal - Smart Factory Attendance{% endblock %}
+{% block page_title %}Shift Check-Out Station{% endblock %}
+
+{% block content %}
+<section class="check-out-page fade-in-up">
+    {# ---- Page Header ---- #}
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
+        <div>
+            <h2 class="h4 fw-bold text-light mb-1">
+                <i data-lucide="log-out" class="d-inline-block text-danger me-2" style="width: 24px; height: 24px;"></i>
+                Worker Shift Handover &amp; Check-Out Terminal
+            </h2>
+            <p class="text-secondary small mb-0">Verify daily check-in logs and finalize shift check-out with automated audit timestamps</p>
+        </div>
+        <div>
+            <a href="{{ url_for('attendance.attendance_view') }}" class="btn btn-outline-secondary btn-sm">
+                <i data-lucide="clipboard-list" style="width: 14px; height: 14px;"></i> View Attendance Logs
+            </a>
+        </div>
+    </div>
+
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            {# ---- Worker Lookup Console ---- #}
+            <div class="card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h3 class="card-title">
+                        <i data-lucide="search" class="text-info"></i>
+                        Worker Identification
+                    </h3>
+                    <span class="badge bg-secondary font-monospace">Active Shift Verification</span>
+                </div>
+                <div class="card-body p-4">
+                    <form id="lookup-form" autocomplete="off" onsubmit="event.preventDefault(); lookupEmployee();">
+                        <div class="mb-3">
+                            <label for="employee-id" class="form-label fw-bold">Select or Enter Worker ID</label>
+                            <select class="form-select mb-2" id="employee-quick-select" onchange="syncLookupInput(this.value)">
+                                <option value="" selected>-- Pick from Active Registered Workers --</option>
+                                {% if employees %}
+                                    {% for emp in employees %}
+                                        <option value="{{ emp.employee_id }}">
+                                            {{ emp.employee_id }} &mdash; {{ emp.first_name }} {{ emp.last_name }} ({{ emp.department }})
+                                        </option>
+                                    {% endfor %}
+                                {% endif %}
+                            </select>
+                            <input type="text" class="form-control font-monospace" id="employee-id" name="employee_id"
+                                   placeholder="e.g. PRD-0001" required>
+                        </div>
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-primary btn-lg" id="lookup-btn">
+                                <i data-lucide="search" style="width: 18px; height: 18px;"></i> Verify Shift &amp; Check Status
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            {# ---- Dynamic Status Result Container ---- #}
+            <div id="status-area">
+                <div class="text-center text-muted py-5 card p-4">
+                    <div class="p-4 rounded-circle d-inline-flex mb-3 mx-auto" style="background: rgba(6, 182, 212, 0.05); border: 1px solid var(--border-accent);">
+                        <i data-lucide="badge-check" class="text-info" style="width: 44px; height: 44px;"></i>
+                    </div>
+                    <h4 class="h5 fw-bold text-light mb-1">Awaiting Worker Identification</h4>
+                    <p class="small text-muted mb-0">Select or enter a worker ID above and click "Verify Shift &amp; Check Status" to review attendance status and submit check-out.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    var employeeIdInput = document.getElementById("employee-id");
+    var lookupBtn = document.getElementById("lookup-btn");
+    var statusArea = document.getElementById("status-area");
+    var currentEmployeeId = null;
+
+    function syncLookupInput(val) {
+        if (val) {
+            employeeIdInput.value = val;
+        }
+    }
+
+    function showStatusArea(html) {
+        statusArea.innerHTML = html;
+        if (window.lucide) { lucide.createIcons(); }
+    }
+
+    function resetStatusArea() {
+        statusArea.innerHTML =
+            '<div class="text-center text-muted py-5 card p-4">' +
+            '<div class="p-4 rounded-circle d-inline-flex mb-3 mx-auto" style="background: rgba(6, 182, 212, 0.05); border: 1px solid var(--border-accent);">' +
+            '<i data-lucide="badge-check" class="text-info" style="width: 44px; height: 44px;"></i>' +
+            '</div>' +
+            '<h4 class="h5 fw-bold text-light mb-1">Awaiting Worker Identification</h4>' +
+            '<p class="small text-muted mb-0">Select or enter a worker ID above and click "Verify Shift &amp; Check Status" to review attendance status and submit check-out.</p>' +
+            '</div>';
+        currentEmployeeId = null;
+        if (window.lucide) { lucide.createIcons(); }
+    }
+
+    function lookupEmployee() {
+        var empId = employeeIdInput.value.trim();
+        if (!empId) {
+            showStatusArea(
+                '<div class="alert alert-warning d-flex align-items-center gap-2">' +
+                '<i data-lucide="alert-triangle" style="width:18px;height:18px;"></i>' +
+                '<span>Please enter or pick an Employee ID.</span>' +
+                '</div>'
+            );
+            return;
+        }
+
+        currentEmployeeId = empId;
+        lookupBtn.disabled = true;
+        lookupBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span> Checking...';
+
+        fetch("{{ url_for('attendance.employee_info') }}?employee_id=" + encodeURIComponent(empId))
+            .then(function (response) { return response.json(); })
+            .then(function (data) {
+                lookupBtn.disabled = false;
+                lookupBtn.innerHTML = '<i data-lucide="search" style="width: 18px; height: 18px;"></i> Verify Shift &amp; Check Status';
+
+                if (data.status === "error") {
+                    var is404 = data.message.indexOf("not found") !== -1;
+                    showStatusArea(
+                        '<div class="alert ' + (is404 ? 'alert-warning' : 'alert-danger') + ' d-flex align-items-center gap-2">' +
+                        '<i data-lucide="' + (is404 ? 'alert-triangle' : 'alert-circle') + '" style="width:18px;height:18px;"></i>' +
+                        '<span>' + escapeHtml(data.message) + '</span>' +
+                        '</div>'
+                    );
+                    return;
+                }
+
+                renderEmployeeStatus(data);
+            })
+            .catch(function () {
+                lookupBtn.disabled = false;
+                lookupBtn.innerHTML = '<i data-lucide="search" style="width: 18px; height: 18px;"></i> Verify Shift &amp; Check Status';
+                showStatusArea(
+                    '<div class="alert alert-danger d-flex align-items-center gap-2">' +
+                    '<i data-lucide="alert-circle" style="width:18px;height:18px;"></i>' +
+                    '<span>An error occurred while looking up the employee record.</span>' +
+                    '</div>'
+                );
+            });
+    }
+
+    function renderEmployeeStatus(data) {
+        var emp = data.employee;
+        var checkedIn = data.checked_in;
+        var checkedOut = data.checked_out;
+        var checkInTime = data.check_in_time;
+        var checkOutTime = data.check_out_time;
+
+        var html = '<div class="card">';
+        html += '  <div class="card-header d-flex justify-content-between align-items-center">';
+        html += '    <h3 class="card-title"><i data-lucide="id-card" class="text-info"></i> Worker Profile &amp; Shift Status</h3>';
+        html += '    <span class="badge bg-secondary font-monospace">' + escapeHtml(emp.employee_id) + '</span>';
+        html += '  </div>';
+        html += '  <div class="card-body p-4">';
+
+        html += '  <div class="d-flex align-items-center gap-3 mb-4 pb-3 border-bottom border-secondary border-opacity-25">';
+        html += '    <div class="profile-avatar" style="width: 48px; height: 48px; font-size: 1.1rem;">' + emp.first_name[0].toUpperCase() + emp.last_name[0].toUpperCase() + '</div>';
+        html += '    <div>';
+        html += '      <h4 class="h5 fw-bold text-light mb-0">' + escapeHtml(emp.first_name + ' ' + emp.last_name) + '</h4>';
+        html += '      <div class="small text-muted font-monospace">' + escapeHtml(emp.department) + ' &bull; Shift: ' + escapeHtml(emp.shift) + '</div>';
+        html += '    </div>';
+        html += '  </div>';
+
+        html += '  <div class="p-3 rounded mb-4" style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-subtle);">';
+        html += '    <div class="row g-3 text-center">';
+
+        html += '      <div class="col-6 border-end border-secondary border-opacity-25">';
+        if (checkedIn) {
+            html += '        <span class="badge bg-success mb-2"><i data-lucide="check" style="width:12px;height:12px;"></i> Checked In</span>';
+            html += '        <div class="font-monospace text-light small">' + formatDateTime(checkInTime) + '</div>';
+        } else {
+            html += '        <span class="badge bg-danger mb-2"><i data-lucide="x" style="width:12px;height:12px;"></i> Not Checked In</span>';
+            html += '        <div class="font-monospace text-muted small">No check-in today</div>';
+        }
+        html += '      </div>';
+
+        html += '      <div class="col-6">';
+        if (checkedOut) {
+            html += '        <span class="badge bg-success mb-2"><i data-lucide="check-check" style="width:12px;height:12px;"></i> Checked Out</span>';
+            html += '        <div class="font-monospace text-light small">' + formatDateTime(checkOutTime) + '</div>';
+        } else if (checkedIn) {
+            html += '        <span class="badge bg-warning mb-2"><i data-lucide="clock" style="width:12px;height:12px;"></i> On Shift</span>';
+            html += '        <div class="font-monospace text-info small">Eligible for check-out</div>';
+        } else {
+            html += '        <span class="badge bg-secondary mb-2">Not Applicable</span>';
+            html += '        <div class="font-monospace text-muted small">Prior check-in required</div>';
+        }
+        html += '      </div>';
+        html += '    </div>';
+        html += '  </div>';
+
+        if (checkedOut) {
+            html += '  <div class="alert alert-info mb-0 d-flex align-items-center gap-2">';
+            html += '    <i data-lucide="check-circle" style="width:18px;height:18px;"></i>';
+            html += '    <span>This employee has already concluded their shift and checked out today at ' + formatDateTime(checkOutTime) + '.</span>';
+            html += '  </div>';
+        } else if (checkedIn) {
+            html += '  <div class="d-grid">';
+            html += '    <button type="button" class="btn btn-danger btn-lg" id="do-checkout-btn" onclick="submitCheckOut(\'' + escapeHtml(emp.employee_id) + '\')">';
+            html += '      <i data-lucide="log-out" style="width: 18px; height: 18px;"></i> Confirm &amp; Finalize Shift Check-Out';
+            html += '    </button>';
+            html += '  </div>';
+        } else {
+            html += '  <div class="alert alert-warning mb-0 d-flex align-items-center gap-2">';
+            html += '    <i data-lucide="alert-triangle" style="width:18px;height:18px;"></i>';
+            html += '    <span>No check-in record exists for this employee today. Check-out cannot be recorded without an active check-in.</span>';
+            html += '  </div>';
+        }
+
+        html += '  </div>';
+        html += '</div>';
+
+        showStatusArea(html);
+    }
+
+    function submitCheckOut(employeeId) {
+        var btn = document.getElementById("do-checkout-btn");
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span> Finalizing Check-Out...';
+        }
+
+        var fd = new FormData();
+        fd.append("employee_id", employeeId);
+
+        fetch("{{ url_for('attendance.check_out') }}", {
+            method: "POST",
+            body: fd
+        })
+        .then(function (response) { return response.json(); })
+        .then(function (data) {
+            if (data.status === "ok") {
+                showStatusArea(
+                    '<div class="card p-4 text-center">' +
+                    '<div class="p-3 rounded-circle bg-success bg-opacity-25 d-inline-flex mb-3 mx-auto text-success">' +
+                    '<i data-lucide="check-circle-2" style="width: 44px; height: 44px;"></i>' +
+                    '</div>' +
+                    '<h4 class="h5 fw-bold text-light mb-1">Shift Check-Out Recorded!</h4>' +
+                    '<p class="text-secondary small mb-3">Worker <strong>' + escapeHtml(employeeId) + '</strong> successfully completed shift at ' + formatDateTime(data.check_out_time) + '</p>' +
+                    '<div>' +
+                    '<button type="button" class="btn btn-outline-secondary btn-sm" onclick="resetStatusArea()">' +
+                    '<i data-lucide="rotate-ccw" style="width: 14px; height: 14px;"></i> Process Another Worker' +
+                    '</button>' +
+                    '</div>' +
+                    '</div>'
+                );
+            } else {
+                showStatusArea(
+                    '<div class="alert alert-danger d-flex align-items-center gap-2">' +
+                    '<i data-lucide="alert-circle" style="width:18px;height:18px;"></i>' +
+                    '<span>' + escapeHtml(data.message || "Failed to record check-out.") + '</span>' +
+                    '</div>'
+                );
+            }
+        })
+        .catch(function () {
+            showStatusArea(
+                '<div class="alert alert-danger d-flex align-items-center gap-2">' +
+                '<i data-lucide="alert-circle" style="width:18px;height:18px;"></i>' +
+                '<span>Network error during check-out operation.</span>' +
+                '</div>'
+            );
+        });
+    }
+</script>
+{% endblock %}

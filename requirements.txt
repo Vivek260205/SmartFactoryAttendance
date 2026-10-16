@@ -1,0 +1,41 @@
+# requirements.txt
+# ====================
+# Python dependencies for the Smart Factory Attendance with Safety Gear Check project.
+# Install with: pip install -r requirements.txt
+
+# Web framework
+Flask==3.0.0
+
+# Database ORM
+Flask-SQLAlchemy==3.1.1
+SQLAlchemy==2.0.23
+
+# Database migrations
+Flask-Migrate==4.0.5
+
+# Forms and validation
+Flask-WTF==1.2.1
+WTForms==3.1.1
+
+# Environment variable management
+python-dotenv==1.0.0
+
+# Image processing (for safety gear snapshots)
+Pillow==10.2.0
+
+# Computer vision / safety gear detection
+# NOTE: These are required ONLY when a trained PPE model is configured.
+# Install them to enable real PPE detection:
+#   pip install ultralytics
+# opencv-python==4.9.0.80
+# ultralytics==8.1.0  # YOLO for object detection
+
+# HTTP requests (for external API integrations)
+requests==2.31.0
+
+# Production WSGI server
+gunicorn==21.2.0
+
+# Testing
+pytest==7.4.4
+pytest-flask==1.3.0

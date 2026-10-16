@@ -1,0 +1,407 @@
+{# face_enroll.html #}
+{# SmartFactoryAttendance — Facial Biometric Enrollment Terminal #}
+
+{% extends "base.html" %}
+
+{% block title %}Enroll Employee Face - Smart Factory Attendance{% endblock %}
+{% block page_title %}Enroll Employee Face - Biometric Terminal{% endblock %}
+
+{% block content %}
+<section class="face-enroll fade-in-up">
+    {# ---- Page Header ---- #}
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
+        <div>
+            <h2 class="h4 fw-bold text-light mb-1">
+                <i data-lucide="user-plus" class="d-inline-block text-info me-2" style="width: 24px; height: 24px;"></i>
+                Enroll Employee Face
+            </h2>
+            <p class="text-secondary small mb-0">Capture and store high-dimensional normalized face encodings for automated plant floor check-in</p>
+        </div>
+        <div>
+            <a href="{{ url_for('main.register') }}" class="btn btn-outline-secondary btn-sm">
+                <i data-lucide="arrow-left" style="width: 14px; height: 14px;"></i> Back to Workforce Directory
+            </a>
+        </div>
+    </div>
+
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h3 class="card-title">
+                        <i data-lucide="camera" class="text-info"></i>
+                        Biometric Profile Setup
+                    </h3>
+                    <span class="badge bg-secondary font-monospace">OpenCV YuNet Engine</span>
+                </div>
+                <div class="card-body p-4">
+                    {# Worker ID Input #}
+                    <div class="mb-4">
+                        <label for="employee-id" class="form-label fw-bold">Worker Identifier <span class="text-danger">*</span></label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-transparent text-muted" style="border-color: var(--border-subtle);">
+                                <i data-lucide="hash" style="width: 16px; height: 16px;"></i>
+                            </span>
+                            <input type="text" class="form-control font-monospace" id="employee-id" name="employee_id"
+                                   value="{{ employee_id | default('') }}" placeholder="e.g. PRD-0001" required>
+                        </div>
+                        <div class="form-text text-muted">Enter the unique factory worker ID assigned during registration.</div>
+                    </div>
+
+                    {# Method Tabs: Camera Capture vs Gallery Upload #}
+                    <ul class="nav nav-pills mb-3 gap-2" id="enrollTabs" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active" id="camera-tab" data-bs-toggle="pill" data-bs-target="#camera-enroll" type="button" role="tab">
+                                <i data-lucide="video" style="width: 15px; height: 15px;" class="me-1"></i> Live Optical Sensor
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="gallery-tab" data-bs-toggle="pill" data-bs-target="#gallery-enroll" type="button" role="tab">
+                                <i data-lucide="image" style="width: 15px; height: 15px;" class="me-1"></i> Gallery Image Upload
+                            </button>
+                        </li>
+                    </ul>
+
+                    <div class="tab-content" id="enrollTabContent">
+                        {# ---- Tab 1: Live Camera Enrollment ---- #}
+                        <div class="tab-pane fade show active" id="camera-enroll" role="tabpanel">
+                            <div class="p-3 rounded mb-3" style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-subtle);">
+                                <div class="camera-wrapper mb-3" id="camera-container" style="max-width: 560px; margin: 0 auto;">
+                                    <div class="hud-corner hud-corner-tl"></div>
+                                    <div class="hud-corner hud-corner-tr"></div>
+                                    <div class="hud-corner hud-corner-bl"></div>
+                                    <div class="hud-corner hud-corner-br"></div>
+                                    <div class="hud-scan-line"></div>
+                                    <video id="video" width="100%" height="auto" autoplay playsinline muted></video>
+                                    <canvas id="canvas" width="640" height="480" style="display:none;"></canvas>
+                                </div>
+
+                                <div id="camera-status" class="alert alert-secondary mb-2 d-flex align-items-center gap-2">
+                                    <span class="spinner-border spinner-border-sm text-info me-1" role="status"></span>
+                                    <span>Starting optical sensor stream...</span>
+                                </div>
+
+                                <div id="face-detect-indicator" class="alert alert-success d-none d-flex align-items-center gap-2 mb-2">
+                                    <i data-lucide="scan-face" style="width: 18px; height: 18px;"></i>
+                                    <span>Single frontal face detected &mdash; auto-enrolling encoding...</span>
+                                </div>
+
+                                <div class="d-flex justify-content-center gap-2 mt-3">
+                                    <button type="button" class="btn btn-primary" id="capture-btn" disabled>
+                                        <i data-lucide="camera" style="width: 16px; height: 16px;"></i> Capture Face Photo
+                                    </button>
+                                    <button type="button" class="btn btn-outline-secondary" id="retake-btn" style="display:none;">
+                                        <i data-lucide="refresh-cw" style="width: 16px; height: 16px;"></i> Retake Frame
+                                    </button>
+                                </div>
+                            </div>
+
+                            {# Preview of captured frame #}
+                            <div id="preview-container" class="text-center p-3 rounded mb-3" style="display:none; background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-accent);">
+                                <h6 class="text-secondary small fw-semibold text-uppercase mb-2">Captured Biometric Snapshot:</h6>
+                                <img id="preview" src="" alt="Captured face snapshot"
+                                     style="max-width: 280px; max-height: 220px; border-radius: var(--radius-sm); border: 2px solid var(--border-accent);">
+                                <div class="mt-3">
+                                    <button type="button" class="btn btn-success" id="save-face-btn">
+                                        <i data-lucide="save" style="width: 16px; height: 16px;"></i> Store Biometric Profile in Database
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        {# ---- Tab 2: Gallery Upload Fallback ---- #}
+                        <div class="tab-pane fade" id="gallery-enroll" role="tabpanel">
+                            <form id="enroll-form" enctype="multipart/form-data">
+                                <div class="p-4 rounded border border-secondary border-opacity-25 mb-3" style="background: rgba(255, 255, 255, 0.02);">
+                                    <div class="mb-3">
+                                        <label for="face-photo" class="form-label fw-bold">Select Worker Photograph</label>
+                                        <input type="file" class="form-control" id="face-photo" name="file" accept="image/png,image/jpeg" required>
+                                        <div class="form-text text-muted">Upload a clear, front-facing portrait photograph without obstructions.</div>
+                                    </div>
+                                    <button type="submit" class="btn btn-outline-primary" id="enroll-btn">
+                                        <i data-lucide="upload" style="width: 16px; height: 16px;"></i> Extract Encodings &amp; Save
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+
+                    {# Status Message Container #}
+                    <div id="enroll-status" class="mt-3"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    var video = document.getElementById("video");
+    var canvas = document.getElementById("canvas");
+    var captureBtn = document.getElementById("capture-btn");
+    var retakeBtn = document.getElementById("retake-btn");
+    var saveFaceBtn = document.getElementById("save-face-btn");
+    var previewContainer = document.getElementById("preview-container");
+    var preview = document.getElementById("preview");
+    var cameraStatus = document.getElementById("camera-status");
+    var enrollStatus = document.getElementById("enroll-status");
+    var faceDetectIndicator = document.getElementById("face-detect-indicator");
+    var stream = null;
+    var autoDetectInterval = null;
+    var autoDetecting = false;
+    var autoEnrolled = false;
+
+    function updateCameraStatus(message, type) {
+        type = type || "secondary";
+        var icon = type === "success" ? "check-circle" : (type === "danger" ? "alert-circle" : "info");
+        cameraStatus.className = "alert alert-" + type + " mb-2 d-flex align-items-center gap-2";
+        cameraStatus.innerHTML = "<i data-lucide='" + icon + "' style='width:16px;height:16px;'></i> <span>" + message + "</span>";
+        if (window.lucide) { lucide.createIcons(); }
+    }
+
+    function showStatus(message, type) {
+        type = type || "info";
+        enrollStatus.innerHTML = "<div class='alert alert-" + type + " mb-0'>" + message + "</div>";
+        if (window.lucide) { lucide.createIcons(); }
+    }
+
+    function clearStatus() {
+        enrollStatus.innerHTML = "";
+    }
+
+    function startCamera() {
+        navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: "user" } })
+            .then(function(s) {
+                stream = s;
+                video.srcObject = s;
+                video.play();
+                updateCameraStatus("Optical sensor active. Center worker's face in viewfinder.", "success");
+                captureBtn.disabled = false;
+                startAutoDetection();
+            })
+            .catch(function(err) {
+                updateCameraStatus("Could not access camera: " + err.message + ". Use gallery upload tab.", "danger");
+                captureBtn.disabled = true;
+            });
+    }
+
+    function startAutoDetection() {
+        if (autoDetectInterval) {
+            clearInterval(autoDetectInterval);
+        }
+        autoDetectInterval = setInterval(function() {
+            if (autoDetecting || autoEnrolled || !stream) {
+                return;
+            }
+            detectFaceAuto();
+        }, 750);
+    }
+
+    function stopAutoDetection() {
+        if (autoDetectInterval) {
+            clearInterval(autoDetectInterval);
+            autoDetectInterval = null;
+        }
+    }
+
+    function detectFaceAuto() {
+        if (!video.videoWidth || !video.videoHeight) {
+            return;
+        }
+        autoDetecting = true;
+
+        var maxWidth = 640;
+        var maxHeight = 480;
+        var ratio = Math.min(maxWidth / video.videoWidth, maxHeight / video.videoHeight, 1);
+        var drawWidth = Math.round(video.videoWidth * ratio);
+        var drawHeight = Math.round(video.videoHeight * ratio);
+        canvas.width = drawWidth;
+        canvas.height = drawHeight;
+        var ctx = canvas.getContext("2d");
+        ctx.drawImage(video, 0, 0, drawWidth, drawHeight);
+        var dataURL = canvas.toDataURL("image/jpeg", 0.8);
+
+        var fd = new FormData();
+        fd.append("image_data", dataURL);
+
+        fetch("{{ url_for('face_attendance.detect_face') }}", { method: "POST", body: fd })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                autoDetecting = false;
+                if (data.status === "ok" && data.face_detected && data.face_count === 1) {
+                    if (faceDetectIndicator) {
+                        faceDetectIndicator.classList.remove("d-none");
+                    }
+                    updateCameraStatus("Face verified. Capturing profile automatically...", "success");
+                    stopAutoDetection();
+                    autoCaptureAndEnroll();
+                }
+            })
+            .catch(function() {
+                autoDetecting = false;
+            });
+    }
+
+    function autoCaptureAndEnroll() {
+        var employeeId = document.getElementById("employee-id").value.trim();
+        if (!employeeId) {
+            showStatus("<i data-lucide='alert-triangle' class='me-1' style='width:16px;height:16px;'></i> Please enter an Employee ID.", "danger");
+            return;
+        }
+
+        var dataURL = canvas.toDataURL("image/jpeg", 0.8);
+        saveFaceBtn.disabled = true;
+        saveFaceBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Enrolling...';
+        showStatus("Auto-extracting YuNet normalized facial patch for worker " + escapeHtml(employeeId) + "...", "secondary");
+
+        var fd = new FormData();
+        fd.append("employee_id", employeeId);
+        fd.append("image_data", dataURL);
+
+        fetch("{{ url_for('face_attendance.enroll_capture') }}", { method: "POST", body: fd })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                saveFaceBtn.disabled = false;
+                saveFaceBtn.innerHTML = '<i data-lucide="save" style="width:16px;height:16px;"></i> Store Biometric Profile';
+                if (data.status === "ok") {
+                    autoEnrolled = true;
+                    showStatus("<i data-lucide='check-circle-2' class='me-1' style='width:16px;height:16px;'></i> " +
+                        (data.message || "Face enrolled successfully!") + " &bull; Worker: <strong>" + escapeHtml(employeeId) + "</strong>", "success");
+                    updateCameraStatus("Biometric profile successfully stored in database.", "success");
+                    if (faceDetectIndicator) {
+                        faceDetectIndicator.classList.add("d-none");
+                    }
+                    if (stream) {
+                        stream.getTracks().forEach(function(t) { t.stop(); });
+                    }
+                } else {
+                    showStatus("<i data-lucide='alert-circle' class='me-1' style='width:16px;height:16px;'></i> " +
+                        (data.message || "Failed to enroll face."), "danger");
+                    updateCameraStatus("Enrollment failed. Click 'Capture Face Photo' manually.", "warning");
+                    startAutoDetection();
+                }
+                if (window.lucide) { lucide.createIcons(); }
+            })
+            .catch(function() {
+                saveFaceBtn.disabled = false;
+                showStatus("An error occurred during facial enrollment.", "danger");
+                startAutoDetection();
+                if (window.lucide) { lucide.createIcons(); }
+            });
+    }
+
+    function captureFrame() {
+        var ctx = canvas.getContext("2d");
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        var dataURL = canvas.toDataURL("image/jpeg", 0.8);
+        preview.src = dataURL;
+        previewContainer.style.display = "block";
+        retakeBtn.style.display = "inline-block";
+        captureBtn.style.display = "none";
+        updateCameraStatus("Photo captured. Review and click 'Store Biometric Profile'.", "info");
+        if (window.lucide) { lucide.createIcons(); }
+    }
+
+    function retakePhoto() {
+        previewContainer.style.display = "none";
+        retakeBtn.style.display = "none";
+        captureBtn.style.display = "inline-block";
+        updateCameraStatus("Optical sensor ready. Position face and click Capture.", "success");
+        if (window.lucide) { lucide.createIcons(); }
+    }
+
+    function saveFace() {
+        var employeeId = document.getElementById("employee-id").value.trim();
+        if (!employeeId) {
+            showStatus("<i data-lucide='alert-triangle' class='me-1' style='width:16px;height:16px;'></i> Please enter an Employee ID.", "danger");
+            return;
+        }
+
+        var dataURL = canvas.toDataURL("image/jpeg", 0.8);
+        saveFaceBtn.disabled = true;
+        saveFaceBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Saving...';
+        showStatus("Saving facial encoding to database...", "secondary");
+
+        var fd = new FormData();
+        fd.append("employee_id", employeeId);
+        fd.append("image_data", dataURL);
+
+        fetch("{{ url_for('face_attendance.enroll_capture') }}", { method: "POST", body: fd })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                saveFaceBtn.disabled = false;
+                saveFaceBtn.innerHTML = '<i data-lucide="save" style="width:16px;height:16px;"></i> Store Biometric Profile in Database';
+                if (data.status === "ok") {
+                    showStatus("<i data-lucide='check-circle-2' class='me-1' style='width:16px;height:16px;'></i> " +
+                        (data.message || "Face enrolled successfully!") + " &bull; Worker: <strong>" + escapeHtml(employeeId) + "</strong>", "success");
+                    if (stream) {
+                        stream.getTracks().forEach(function(t) { t.stop(); });
+                    }
+                } else {
+                    showStatus("<i data-lucide='alert-circle' class='me-1' style='width:16px;height:16px;'></i> " +
+                        (data.message || "Failed to enroll face."), "danger");
+                }
+                if (window.lucide) { lucide.createIcons(); }
+            })
+            .catch(function() {
+                saveFaceBtn.disabled = false;
+                showStatus("An error occurred while enrolling face.", "danger");
+                if (window.lucide) { lucide.createIcons(); }
+            });
+    }
+
+    document.addEventListener("DOMContentLoaded", function () {
+        startCamera();
+
+        captureBtn.addEventListener("click", captureFrame);
+        retakeBtn.addEventListener("click", retakePhoto);
+        saveFaceBtn.addEventListener("click", saveFace);
+
+        document.getElementById("enroll-form").addEventListener("submit", function (e) {
+            e.preventDefault();
+            var employeeId = document.getElementById("employee-id").value.trim();
+            if (!employeeId) {
+                showStatus("<i data-lucide='alert-triangle' class='me-1' style='width:16px;height:16px;'></i> Please enter an Employee ID.", "danger");
+                return;
+            }
+            var btn = document.getElementById("enroll-btn");
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Processing...';
+            showStatus("Extracting facial encodings from photograph...", "secondary");
+
+            var fd = new FormData();
+            fd.append("employee_id", employeeId);
+            var f = document.getElementById("face-photo").files[0];
+            if (!f) {
+                showStatus("<i data-lucide='alert-triangle' class='me-1' style='width:16px;height:16px;'></i> Please select an image file.", "danger");
+                btn.disabled = false;
+                btn.innerHTML = '<i data-lucide="upload" style="width:16px;height:16px;"></i> Extract Encodings & Save';
+                return;
+            }
+            fd.append("file", f);
+
+            fetch("{{ url_for('face_attendance.enroll') }}", { method: "POST", body: fd })
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    btn.disabled = false;
+                    btn.innerHTML = '<i data-lucide="upload" style="width:16px;height:16px;"></i> Extract Encodings & Save';
+                    if (data.status === "ok") {
+                        showStatus("<i data-lucide='check-circle-2' class='me-1' style='width:16px;height:16px;'></i> " +
+                            (data.message || "Face enrolled.") + " &bull; Worker: <strong>" + escapeHtml(employeeId) + "</strong>", "success");
+                    } else {
+                        showStatus("<i data-lucide='alert-circle' class='me-1' style='width:16px;height:16px;'></i> " +
+                            (data.message || "Failed to enroll face."), "danger");
+                    }
+                    if (window.lucide) { lucide.createIcons(); }
+                })
+                .catch(function() {
+                    btn.disabled = false;
+                    btn.innerHTML = '<i data-lucide="upload" style="width:16px;height:16px;"></i> Extract Encodings & Save';
+                    showStatus("Network error occurred while enrolling face.", "danger");
+                    if (window.lucide) { lucide.createIcons(); }
+                });
+        });
+    });
+</script>
+{% endblock %}
