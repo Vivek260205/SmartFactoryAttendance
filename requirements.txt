@@ -27,8 +27,8 @@ Pillow==10.2.0
 # NOTE: These are required ONLY when a trained PPE model is configured.
 # Install them to enable real PPE detection:
 #   pip install ultralytics
-# opencv-python==4.9.0.80
-# ultralytics==8.1.0  # YOLO for object detection
+# opencv-python-headless
+ultralytics
 
 # HTTP requests (for external API integrations)
 requests==2.31.0
